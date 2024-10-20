@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { RepositoryDetails, GitHubFork } from '@/services/githubService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
-import ForceGraph2D from 'react-force-graph-2d';
+
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
 interface RepositoryVisualizationsProps {
     repository: RepositoryDetails;
@@ -21,7 +23,7 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
     const [error, setError] = useState<string | null>(null);
     const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
 
-    const fgRef = useRef<ForceGraph2D>(null);
+    const fgRef = useRef<any>(null);
 
     useEffect(() => {
         const fetchData = async () => {

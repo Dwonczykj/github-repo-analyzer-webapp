@@ -36,6 +36,9 @@ All individuals have different strengths so be sure to choose the approach to pr
 7. Optional: As a User I would like to view a chart that displays the breakdown of issues for the repository (open vs closed) in order to visually see how well built and maintained the repository is\
 \
 \
+Could also add ability to login using OAuth and then make client side checks using the user's authentication token to access github resources...
+
+Should also be able to prompt github copilot using ai to find resources using llm prompts. There may be opensource projects that show us how to do this?
 ## Additional Points and Notes:\
 \
 1. Implement the best design possible for the user interface. You are encouraged to make use of interface design solutions such as Twitter Bootstrap, Material and any other libraries you may deem necessary to provide your best solution.\

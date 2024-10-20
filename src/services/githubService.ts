@@ -1,9 +1,20 @@
 import axios from 'axios';
 import logger from '@/config/logging';
 
+function serverSideOnly<T extends (...args: any[]) => ReturnType<T>>(fn: T): T {
+    const wrappedFunction = ((...args: Parameters<T>): ReturnType<T> => {
+        if (typeof window !== 'undefined') {
+            throw new Error(`${fn.name} can only be called on the server side.`);
+        }
+        return fn(...args);
+    }) as any as T;
+
+    return wrappedFunction;
+}
+
 const GITHUB_ACCESS_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
 
-if (!GITHUB_ACCESS_TOKEN) {
+if (typeof window === 'undefined' && !GITHUB_ACCESS_TOKEN) {
     logger.error('GITHUB_ACCESS_TOKEN is not set');
 }
 
@@ -152,184 +163,168 @@ const filterRepositoriesByRegex = (repositories: Repository[], pattern: string):
     );
 };
 
-export const searchRepositoriesWithRegex = async (query: string, page: number = 1, perPage: number = 30): Promise<{ repositories: Repository[], totalCount: number }> => {
-    const isRegex = isValidRegex(query);
-    const searchQuery = isRegex ? query.replace(/[^a-zA-Z0-9]/g, '') : query;
+export class GitHubService {
+    static searchRepositoriesWithRegex = serverSideOnly(async (query: string, page: number = 1, perPage: number = 30): Promise<{ repositories: Repository[], totalCount: number }> => {
+        const isRegex = isValidRegex(query);
+        let searchQuery = query;
 
-    const response = await githubApi.get('/search/repositories', {
-        params: {
-            q: searchQuery,
-            page,
-            per_page: isRegex ? 100 : perPage // Fetch more results if it's a regex query
-        },
-    });
+        // Handle qualifiers
+        const qualifiers = ['repo:', 'user:', 'org:', 'language:', 'path:', 'symbol:', 'content:', 'is:'];
+        const hasQualifier = qualifiers.some(q => query.includes(q));
 
-    let repositories = response.data.items;
-    let totalCount = response.data.total_count;
+        if (isRegex && !hasQualifier) {
+            searchQuery = query.replace(/[^a-zA-Z0-9]/g, '');
+        }
 
-    if (isRegex) {
-        repositories = filterRepositoriesByRegex(repositories, query);
-        totalCount = repositories.length;
-
-        // Apply paging after filtering
-        const startIndex = (page - 1) * perPage;
-        repositories = repositories.slice(startIndex, startIndex + perPage);
-    }
-
-    return { repositories, totalCount };
-};
-
-export const searchRepositories = async (query: string): Promise<Repository[]> => {
-    logger.debug(`Searching repositories with query: ${query}`);
-
-    try {
         const response = await githubApi.get('/search/repositories', {
-            params: { q: query },
+            params: {
+                q: searchQuery,
+                page,
+                per_page: isRegex && !hasQualifier ? 100 : perPage
+            },
         });
 
-        logger.debug(`Found ${response.data.items.length} repositories`);
-        return response.data.items;
-    } catch (error) {
-        logger.error('Error searching repositories:', error);
-        throw error;
-    }
-};
+        let repositories = response.data.items;
+        let totalCount = response.data.total_count;
 
-export const getRepository = async (owner: string, repo: string): Promise<Repository> => {
-    const response = await githubApi.get(`/repos/${owner}/${repo}`);
-    return response.data;
-};
+        if (isRegex && !hasQualifier) {
+            repositories = filterRepositoriesByRegex(repositories, query);
+            totalCount = repositories.length;
 
+            // Apply paging after filtering
+            const startIndex = (page - 1) * perPage;
+            repositories = repositories.slice(startIndex, startIndex + perPage);
+        }
+
+        return { repositories, totalCount };
+    });
+
+    static searchRepositories = serverSideOnly(async (query: string): Promise<Repository[]> => {
+        logger.debug(`Searching repositories with query: ${query}`);
+
+        try {
+            const response = await githubApi.get('/search/repositories', {
+                params: { q: query },
+            });
+
+            logger.debug(`Found ${response.data.items.length} repositories`);
+            return response.data.items;
+        } catch (error) {
+            logger.error('Error searching repositories:', error);
+            throw error;
+        }
+    });
+
+    static getRepository = serverSideOnly(async (owner: string, repo: string): Promise<Repository> => {
+        const response = await githubApi.get(`/repos/${owner}/${repo}`);
+        return response.data;
+    });
+
+    static getIssues = serverSideOnly(async (owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'all'): Promise<Issue[]> => {
+        const response = await githubApi.get(`/repos/${owner}/${repo}/issues`, {
+            params: { state },
+        });
+        return response.data;
+    });
+
+    static getRepositoryDetails = serverSideOnly(async (owner: string, repo: string): Promise<RepositoryDetails> => {
+        logger.debug(`Fetching details for repository: ${owner}/${repo}`);
+        try {
+            const response = await githubApi.get(`/repos/${owner}/${repo}`);
+            logger.debug(`Successfully fetched details for ${owner}/${repo}`);
+            return response.data;
+        } catch (error) {
+            logger.error(`Error fetching repository details for ${owner}/${repo}:`, error);
+            throw error;
+        }
+    });
+
+    static getRepositoryCommits = serverSideOnly(async (owner: string, repo: string): Promise<any[]> => {
+        const response = await githubApi.get(`/repos/${owner}/${repo}/commits`, {
+            params: {
+                per_page: 100 // Fetch up to 100 commits
+            }
+        });
+
+        // Fetch detailed stats for each commit
+        const detailedCommits = await Promise.all(response.data.map(async (commit: any) => {
+            const detailedResponse = await githubApi.get(`/repos/${owner}/${repo}/commits/${commit.sha}`);
+            return {
+                ...commit,
+                stats: detailedResponse.data.stats
+            };
+        }));
+
+        return detailedCommits;
+    });
+
+    static getRepositoryBranches = serverSideOnly(async (owner: string, repo: string): Promise<any[]> => {
+        const response = await githubApi.get(`/repos/${owner}/${repo}/branches`);
+        return response.data;
+    });
+
+    static getRepositoryForks = serverSideOnly(async (owner: string, repo: string): Promise<GitHubFork[]> => {
+        try {
+            const response = await githubApi.get(`/repos/${owner}/${repo}/forks`);
+            return response.data;
+        } catch (error) {
+            logger.error(`Error fetching forks for ${owner}/${repo}:`, error);
+            return [];
+        }
+    });
+
+    static searchRepository = serverSideOnly(async (owner: string, repo: string, query: string): Promise<{ files: any[], issues: any[], commits: any[] }> => {
+        const [filesResponse, issuesResponse, commitsResponse] = await Promise.all([
+            githubApi.get(`/search/code`, { params: { q: `repo:${owner}/${repo} ${query}` } }),
+            githubApi.get(`/search/issues`, { params: { q: `repo:${owner}/${repo} ${query}` } }),
+            githubApi.get(`/search/commits`, { params: { q: `repo:${owner}/${repo} ${query}` } }),
+        ]);
+
+        return {
+            files: filesResponse.data.items,
+            issues: issuesResponse.data.items,
+            commits: commitsResponse.data.items,
+        };
+    });
+}
+
+// Export the static methods
+export const {
+    searchRepositoriesWithRegex,
+    searchRepositories,
+    getRepository,
+    getIssues,
+    getRepositoryDetails,
+    getRepositoryCommits,
+    getRepositoryBranches,
+    getRepositoryForks,
+    searchRepository
+} = GitHubService;
+
+// Add these interfaces if they're not already defined
 export interface Issue {
+    // Define the structure of an Issue
     id: number;
     number: number;
     title: string;
     state: 'open' | 'closed';
     created_at: string;
     updated_at: string;
-    closed_at: string | null;
-    body: string;
-    user: {
-        login: string;
-        id: number;
-        avatar_url: string;
-    };
-    labels: {
-        id: number;
-        name: string;
-        color: string;
-    }[];
-    assignees: {
-        login: string;
-        id: number;
-        avatar_url: string;
-    }[];
-    comments: number;
     html_url: string;
+    comments: string;
+    // Add other properties as needed
 }
 
-export const getIssues = async (owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'all'): Promise<Issue[]> => {
-    const response = await githubApi.get(`/repos/${owner}/${repo}/issues`, {
-        params: { state },
-    });
-    return response.data;
-};
-
-export const getRepositoryDetails = async (owner: string, repo: string): Promise<RepositoryDetails> => {
-    logger.debug(`Fetching details for repository: ${owner}/${repo}`);
-    try {
-        const response = await githubApi.get(`/repos/${owner}/${repo}`);
-        logger.debug(`Successfully fetched details for ${owner}/${repo}`);
-        return response.data;
-    } catch (error) {
-        logger.error(`Error fetching repository details for ${owner}/${repo}:`, error);
-        throw error;
-    }
-};
-
-export const getRepositoryCommits = async (owner: string, repo: string): Promise<any[]> => {
-    const response = await githubApi.get(`/repos/${owner}/${repo}/commits`, {
-        params: {
-            per_page: 100 // Fetch up to 100 commits
-        }
-    });
-
-    // Fetch detailed stats for each commit
-    const detailedCommits = await Promise.all(response.data.map(async (commit: any) => {
-        const detailedResponse = await githubApi.get(`/repos/${owner}/${repo}/commits/${commit.sha}`);
-        return {
-            ...commit,
-            stats: detailedResponse.data.stats
-        };
-    }));
-
-    return detailedCommits;
-};
-
-export const getRepositoryBranches = async (owner: string, repo: string): Promise<any[]> => {
-    const response = await githubApi.get(`/repos/${owner}/${repo}/branches`);
-    return response.data;
-};
-
 export interface GitHubFork {
+    // Define the structure of a GitHubFork
     id: number;
-    node_id: string;
     name: string;
     full_name: string;
     owner: {
         login: string;
         id: number;
         avatar_url: string;
-        html_url: string;
-        type: string;
     };
-    private: boolean;
-    html_url: string;
-    description: string | null;
-    fork: boolean;
-    url: string;
-    created_at: string;
-    updated_at: string;
-    pushed_at: string;
-    homepage: string | null;
-    size: number;
+    // Add other properties as needed
     stargazers_count: number;
-    watchers_count: number;
-    language: string | null;
-    forks_count: number;
-    open_issues_count: number;
-    default_branch: string;
-    is_template: boolean;
-    topics: string[];
-    visibility: string;
-    forks: number;
-    open_issues: number;
-    watchers: number;
-    subscribers_count: number;
-    network_count: number;
-    license: {
-        key: string;
-        name: string;
-        spdx_id: string;
-        url: string;
-        node_id: string;
-    } | null;
 }
-
-export const getRepositoryForks = async (owner: string, repo: string): Promise<GitHubFork[]> => {
-    try {
-        const response = await githubApi.get(`/repos/${owner}/${repo}/forks`);
-        return response.data;
-    } catch (error) {
-        logger.error(`Error fetching forks for ${owner}/${repo}:`, error);
-        return [];
-    }
-};
-
-// export {
-//     searchRepositoriesWithRegex,
-//     getRepositoryDetails,
-//     getRepositoryCommits,
-//     getRepositoryBranches,
-//     getRepositoryForks,
-// };

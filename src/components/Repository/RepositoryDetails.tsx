@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, KeyboardEvent, useEffect } from 'react';
 import { RepositoryDetails as RepoDetails } from '@/services/githubService';
-import { Box, Typography, Paper, Grid, Chip, Link, Button, Dialog, DialogContent, DialogTitle } from '@mui/material';
-import { Star, ForkRight, BugReport, Code, Schedule, Update, Link as LinkIcon, Person } from '@mui/icons-material';
+import { Box, Typography, Paper, Grid, Chip, Link, Button, Dialog, DialogContent, DialogTitle, TextField } from '@mui/material';
+import { Star, ForkRight, BugReport, Code, Schedule, Update, Link as LinkIcon, Person, Search } from '@mui/icons-material';
 import RepositoryVisualizations from './RepositoryVisualizations';
 import RepositoryIssues from './RepositoryIssues';
+import RepositorySearch from './RepositorySearch';
+import { useDebounce } from 'use-debounce';
 
 interface RepositoryDetailsProps {
     repository: RepoDetails;
@@ -11,6 +13,9 @@ interface RepositoryDetailsProps {
 
 const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => {
     const [isIssuesDialogOpen, setIsIssuesDialogOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery] = useDebounce(searchQuery, 1000);
+    const [executeSearch, setExecuteSearch] = useState(false);
 
     const handleOpenIssuesDialog = () => {
         setIsIssuesDialogOpen(true);
@@ -18,6 +23,18 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
 
     const handleCloseIssuesDialog = () => {
         setIsIssuesDialogOpen(false);
+    };
+
+    useEffect(() => {
+        if (debouncedSearchQuery) {
+            setExecuteSearch(true);
+        }
+    }, [debouncedSearchQuery]);
+
+    const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') {
+            setExecuteSearch(true);
+        }
     };
 
     return (
@@ -30,6 +47,30 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
             <Typography variant="body1" paragraph>
                 {repository.description}
             </Typography>
+
+            <Box display="flex" mb={2}>
+                <TextField
+                    fullWidth
+                    variant="outlined"
+                    label="Search within repository"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    InputProps={{
+                        startAdornment: <Typography color="textSecondary" sx={{ mr: 1 }}>{`repo:${repository.full_name}`}</Typography>
+                    }}
+                />
+                <Button variant="contained" onClick={() => setExecuteSearch(true)} sx={{ ml: 1 }}>
+                    <Search />
+                </Button>
+            </Box>
+
+            {executeSearch && (
+                <Box mb={4}>
+                    <RepositorySearch repository={repository} query={debouncedSearchQuery} />
+                </Box>
+            )}
+
             <Grid container spacing={2}>
                 <Grid item xs={12} sm={6} md={4}>
                     <Box display="flex" alignItems="center" mb={1}>
