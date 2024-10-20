@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, KeyboardEvent } from 'react';
 import { Container, Typography, TextField, Button, Box } from '@mui/material';
 import SearchResults from '@/components/Search/SearchResults';
 import { Repository, RepositoryDetails } from '@/services/githubService';
@@ -15,6 +15,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async () => {
+    if (!searchQuery.trim()) return; // Prevent empty searches
     setLoading(true);
     setError(null);
     try {
@@ -27,6 +28,12 @@ export default function Home() {
       console.error(err);
     }
     setLoading(false);
+  };
+
+  const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && searchQuery.trim()) {
+      handleSearch();
+    }
   };
 
   const handleRepoSelect = async (repo: Repository) => {
@@ -61,8 +68,9 @@ export default function Home() {
             label="Search repositories"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={handleKeyPress}
           />
-          <Button variant="contained" onClick={handleSearch} disabled={loading} sx={{ ml: 1 }}>
+          <Button variant="contained" onClick={handleSearch} disabled={loading || !searchQuery.trim()} sx={{ ml: 1 }}>
             Search
           </Button>
         </Box>

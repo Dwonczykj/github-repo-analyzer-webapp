@@ -248,8 +248,22 @@ export const getRepositoryDetails = async (owner: string, repo: string): Promise
 };
 
 export const getRepositoryCommits = async (owner: string, repo: string): Promise<any[]> => {
-    const response = await githubApi.get(`/repos/${owner}/${repo}/commits`);
-    return response.data;
+    const response = await githubApi.get(`/repos/${owner}/${repo}/commits`, {
+        params: {
+            per_page: 100 // Fetch up to 100 commits
+        }
+    });
+
+    // Fetch detailed stats for each commit
+    const detailedCommits = await Promise.all(response.data.map(async (commit: any) => {
+        const detailedResponse = await githubApi.get(`/repos/${owner}/${repo}/commits/${commit.sha}`);
+        return {
+            ...commit,
+            stats: detailedResponse.data.stats
+        };
+    }));
+
+    return detailedCommits;
 };
 
 export const getRepositoryBranches = async (owner: string, repo: string): Promise<any[]> => {

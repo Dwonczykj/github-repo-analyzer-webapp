@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { RepositoryDetails, GitHubFork } from '@/services/githubService';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
+import ForceGraph2D from 'react-force-graph-2d';
 
 interface RepositoryVisualizationsProps {
     repository: RepositoryDetails;
+}
+
+interface GraphData {
+    nodes: Array<{ id: string; group: number }>;
+    links: Array<{ source: string; target: string }>;
 }
 
 const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ repository }) => {
@@ -13,6 +19,9 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
     const [forks, setForks] = useState<GitHubFork[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
+
+    const fgRef = useRef<ForceGraph2D>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -23,6 +32,7 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
                 setCommits(data.commits || []);
                 setBranches(data.branches || []);
                 setForks(data.forks || []);
+                processGraphData(data.commits, data.branches);
             } catch (error) {
                 console.error('Error fetching repository data:', error);
                 setError('Failed to load some repository data. Charts may be incomplete.');
@@ -34,14 +44,46 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
         fetchData();
     }, [repository]);
 
+    const processGraphData = (commits: any[], branches: any[]) => {
+        const nodes = commits.map(commit => ({
+            id: commit.sha,
+            group: 1
+        }));
+
+        const links = commits.map((commit, index) => {
+            if (index < commits.length - 1) {
+                return {
+                    source: commit.sha,
+                    target: commits[index + 1].sha
+                };
+            }
+            return null;
+        }).filter((link): link is { source: string; target: string } => link !== null);
+
+        branches.forEach(branch => {
+            nodes.push({
+                id: branch.name,
+                group: 2
+            });
+            if (branch.commit) {
+                links.push({
+                    source: branch.name,
+                    target: branch.commit.sha
+                });
+            }
+        });
+
+        setGraphData({ nodes, links });
+    };
+
     if (loading) {
         return <CircularProgress />;
     }
 
-    const commitData = commits.map((commit, index) => ({
+    const commitData = commits.map((commit) => ({
         date: new Date(commit.commit.author.date).toLocaleDateString(),
-        commits: commits.length - index,
-    }));
+        linesChanged: commit.stats ? commit.stats.total : 0,
+    })).reverse();
 
     const forkData = forks.map((fork) => ({
         name: fork.owner.login,
@@ -57,15 +99,32 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
 
             {commitData.length > 0 && (
                 <>
-                    <Typography variant="h6" gutterBottom>Commit History</Typography>
+                    <Typography variant="h6" gutterBottom>Commit History (Lines Changed)</Typography>
                     <LineChart width={600} height={300} data={commitData}>
                         <XAxis dataKey="date" />
                         <YAxis />
                         <CartesianGrid strokeDasharray="3 3" />
                         <Tooltip />
                         <Legend />
-                        <Line type="monotone" dataKey="commits" stroke="#8884d8" />
+                        <Line type="monotone" dataKey="linesChanged" stroke="#8884d8" name="Lines Changed" />
                     </LineChart>
+                </>
+            )}
+
+            {graphData.nodes.length > 0 && (
+                <>
+                    <Typography variant="h6" gutterBottom mt={4}>Branch Graph</Typography>
+                    <Box height={400} mb={4} sx={{ border: '1px solid #ccc', borderRadius: '4px', overflow: 'hidden' }}>
+                        <ForceGraph2D
+                            ref={fgRef}
+                            graphData={graphData}
+                            nodeAutoColorBy="group"
+                            nodeLabel="id"
+                            linkDirectionalParticles={2}
+                            width={600}
+                            height={400}
+                        />
+                    </Box>
                 </>
             )}
 
@@ -89,20 +148,6 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
                         </Pie>
                         <Tooltip />
                     </PieChart>
-                </>
-            )}
-
-            {branches.length > 0 && (
-                <>
-                    <Typography variant="h6" gutterBottom mt={4}>Branches</Typography>
-                    <BarChart width={600} height={300} data={branches}>
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="name" fill="#8884d8" />
-                    </BarChart>
                 </>
             )}
         </Box>
