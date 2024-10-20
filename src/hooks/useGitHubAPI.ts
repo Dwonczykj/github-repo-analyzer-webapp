@@ -1,66 +1,53 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useQuery } from 'react-query';
-import githubService, { Repository, Issue } from '../services/githubService';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+import { Repository, Issue } from '../services/githubService';
 
 export const useGitHubAPI = () => {
     const [query, setQuery] = useState('');
-    const [repositories, setRepositories] = useState<Repository[]>([]);
-    const [issues, setIssues] = useState<Issue[]>([]);
+    const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(30);
 
-    const handleSearch = async (searchQuery: string) => {
-        try {
-            const response = await axios.get<Repository[]>(`/api/github-search?query=${encodeURIComponent(searchQuery)}`);
-            setRepositories(response.data);
-        } catch (error) {
-            console.error('Error searching repositories:', error);
-            throw error; // Rethrow the error so it can be caught in the component
-        }
-    };
+    const searchRepositories = useQuery({
+        queryKey: ['searchRepositories', query, page, perPage],
+        queryFn: async () => {
+            const response = await axios.get<{ repositories: Repository[], totalCount: number, page: number, perPage: number }>(
+                `/api/github-search?query=${encodeURIComponent(query)}&page=${page}&perPage=${perPage}`
+            );
+            return response.data;
+        },
+        enabled: !!query,
+    });
 
-    const handleGetRepository = async (owner: string, repo: string) => {
-        try {
+    const getRepository = (owner: string, repo: string) => useQuery({
+        queryKey: ['repository', owner, repo],
+        queryFn: async () => {
             const response = await axios.get<Repository>(`/api/github-get-repository?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`);
-            setRepositories([response.data]);
-        } catch (error) {
-            console.error('Error getting repository:', error);
-        }
-    };
+            return response.data;
+        },
+        enabled: false,
+    });
 
-    const handleGetIssuesForRepository = async (owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'all') => {
-        try {
+    const getIssues = (owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'all') => useQuery({
+        queryKey: ['issues', owner, repo, state],
+        queryFn: async () => {
             const response = await axios.get<Issue[]>(`/api/github-get-repository-issues?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&state=${encodeURIComponent(state)}`);
-            setIssues(response.data);
-        } catch (error) {
-            console.error('Error getting repository issues:', error);
-        }
-    };
-
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const searchRepositories = useQuery(
-        ['searchRepositories', searchQuery],
-        () => githubService.searchRepositories(searchQuery),
-        { enabled: !!searchQuery }
-    );
-
-    const getRepository = useCallback((owner: string, repo: string) => {
-        return useQuery(['repository', owner, repo], () => githubService.getRepository(owner, repo));
-    }, []);
-
-    const getIssues = useCallback((owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'all') => {
-        return useQuery(['issues', owner, repo, state], () => githubService.getIssues(owner, repo, state));
-    }, []);
+            return response.data;
+        },
+        enabled: false,
+    });
 
     return {
         query,
         setQuery,
-        repositories,
-        issues,
-        handleSearch,
-        handleGetRepository,
-        handleGetIssuesForRepository,
+        page,
+        setPage,
+        perPage,
+        setPerPage,
+        searchRepositories,
+        getRepository,
+        getIssues,
     };
 };

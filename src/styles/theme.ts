@@ -1,68 +1,50 @@
-import { createTheme } from '@material-ui/core/styles';
-import { red, blue } from '@material-ui/core/colors';
+import { createTheme, ThemeOptions } from '@mui/material/styles';
+import { PaletteMode } from '@mui/material';
 
-// Create a theme instance.
-const theme = createTheme({
+export const getDesignTokens = (mode: PaletteMode): ThemeOptions => ({
     palette: {
-        primary: {
-            main: blue[700],
-        },
-        secondary: {
-            main: '#19857b',
-        },
-        error: {
-            main: red.A400,
-        },
-        background: {
-            default: '#fff',
-        },
+        mode,
+        ...(mode === 'light'
+            ? {
+                // Light mode palette here
+                primary: {
+                    main: '#1976d2',
+                },
+                background: {
+                    default: '#f5f5f5',
+                    paper: '#ffffff',
+                },
+                text: {
+                    primary: '#333333',
+                    secondary: '#666666',
+                },
+            }
+            : {
+                // Dark mode palette
+                primary: {
+                    main: '#90caf9',
+                },
+                background: {
+                    default: '#121212',
+                    paper: '#1e1e1e',
+                },
+                text: {
+                    primary: '#ffffff',
+                    secondary: '#b0bec5',
+                },
+            }),
     },
-    typography: {
-        fontFamily: [
-            '-apple-system',
-            'BlinkMacSystemFont',
-            '"Segoe UI"',
-            'Roboto',
-            '"Helvetica Neue"',
-            'Arial',
-            'sans-serif',
-            '"Apple Color Emoji"',
-            '"Segoe UI Emoji"',
-            '"Segoe UI Symbol"',
-        ].join(','),
-        h1: {
-            fontSize: '2.5rem',
-            fontWeight: 500,
-        },
-        h2: {
-            fontSize: '2rem',
-            fontWeight: 500,
-        },
-        h3: {
-            fontSize: '1.75rem',
-            fontWeight: 500,
-        },
-        h4: {
-            fontSize: '1.5rem',
-            fontWeight: 500,
-        },
-        h5: {
-            fontSize: '1.25rem',
-            fontWeight: 500,
-        },
-        h6: {
-            fontSize: '1rem',
-            fontWeight: 500,
-        },
-    },
-    overrides: {
-        MuiButton: {
-            root: {
-                textTransform: 'none',
-                fontSize: '1rem',
+    components: {
+        MuiCssBaseline: {
+            styleOverrides: {
+                body: {
+                    color: mode === 'dark' ? '#ffffff' : '#333333',
+                },
             },
         },
     },
 });
 
-export default theme;
+// Create and export a default theme
+const defaultTheme = createTheme(getDesignTokens('light'));
+export default defaultTheme;

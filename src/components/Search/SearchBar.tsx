@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { TextField, Button, Box } from '@material-ui/core';
-import { Search as SearchIcon } from '@material-ui/icons';
+import { TextField, Button, Box } from '@mui/material';
+import { Search as SearchIcon } from '@mui/icons-material';
 
 interface SearchBarProps {
     onSearch: (query: string) => void;

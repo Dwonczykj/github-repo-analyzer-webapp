@@ -1,5 +1,5 @@
 import React from 'react';
-import { List, ListItem, ListItemText, Typography, Box } from '@material-ui/core';
+import { List, ListItem, ListItemButton, ListItemText, Typography, Box } from '@mui/material';
 import { Repository } from '../../services/githubService';
 
 interface SearchResultsProps {
@@ -13,25 +13,23 @@ const SearchResults: React.FC<SearchResultsProps> = ({ repositories, onRepositor
     return (
         <List>
             {repositories.map((repo) => (
-                <ListItem
-                    key={repo.id}
-                    button
-                    onClick={() => onRepositorySelect(repo.owner.login, repo.name)}
-                >
-                    <ListItemText
-                        primary={repo.name}
-                        secondary={
-                            <Box>
-                                <Typography component="span" variant="body2" color="textPrimary">
-                                    {repo.description}
-                                </Typography>
-                                <br />
-                                <Typography component="span" variant="body2">
-                                    Stars: {repo.stargazers_count} | Forks: {repo.forks_count}
-                                </Typography>
-                            </Box>
-                        }
-                    />
+                <ListItem key={repo.id} disablePadding>
+                    <ListItemButton onClick={() => onRepositorySelect(repo.owner.login, repo.name)}>
+                        <ListItemText
+                            primary={repo.name}
+                            secondary={
+                                <Box>
+                                    <Typography component="span" variant="body2" color="text.primary">
+                                        {repo.description}
+                                    </Typography>
+                                    <br />
+                                    <Typography component="span" variant="body2">
+                                        Stars: {repo.stargazers_count} | Forks: {repo.forks_count}
+                                    </Typography>
+                                </Box>
+                            }
+                        />
+                    </ListItemButton>
                 </ListItem>
             ))}
         </List>

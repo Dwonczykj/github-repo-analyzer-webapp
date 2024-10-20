@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Container, Typography, CircularProgress } from '@material-ui/core';
+import { Container, Typography, CircularProgress, Pagination } from '@mui/material';
 import SearchBar from '../components/Search/SearchBar';
 import SearchResults from '../components/Search/SearchResults';
 import { useGitHubAPI } from '../hooks/useGitHubAPI';
@@ -10,38 +10,28 @@ export default function Home() {
   const {
     query,
     setQuery,
-    repositories,
-    handleSearch,
-    handleGetRepository
+    page,
+    setPage,
+    perPage,
+    searchRepositories,
+    getRepository,
   } = useGitHubAPI();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const handleSearchSubmit = async (searchQuery: string) => {
-    setQuery(searchQuery); // Update the query state
-    setIsLoading(true);
-    setError(null);
-    try {
-      await handleSearch(searchQuery); // Pass the searchQuery to handleSearch
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('An error occurred'));
-    } finally {
-      setIsLoading(false);
-    }
+    setQuery(searchQuery);
+    setPage(1);
   };
 
-  const handleRepositorySelect = async (owner: string, repo: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await handleGetRepository(owner, repo);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('An error occurred'));
-    } finally {
-      setIsLoading(false);
-    }
+  const handlePageChange = async (event: React.ChangeEvent<unknown>, value: number) => {
+    setPage(value);
   };
+
+  const { data, isLoading: isSearchLoading, error: searchError } = searchRepositories;
+
+  const totalPages = data ? Math.ceil(data.totalCount / perPage) : 0;
 
   return (
     <Container maxWidth="md">
@@ -49,15 +39,28 @@ export default function Home() {
         GitHub Repository Analyzer
       </Typography>
       <SearchBar onSearch={handleSearchSubmit} />
-      {isLoading ? (
+      {isSearchLoading ? (
         <CircularProgress />
-      ) : error ? (
-        <Typography color="error">{error.message}</Typography>
+      ) : searchError ? (
+        <Typography color="error">{(searchError as Error).message}</Typography>
       ) : (
-        <SearchResults
-          repositories={repositories}
-          onRepositorySelect={handleRepositorySelect}
-        />
+        <>
+          <SearchResults
+            repositories={data?.repositories || []}
+            onRepositorySelect={(owner, repo) => {
+              const { refetch } = getRepository(owner, repo);
+              refetch();
+            }}
+          />
+          {data && data.totalCount > 0 && (
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={handlePageChange}
+              color="primary"
+            />
+          )}
+        </>
       )}
     </Container>
   );
