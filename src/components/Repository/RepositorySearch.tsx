@@ -3,6 +3,7 @@ import { List, ListItemButton, ListItemText, Link, Typography, Popover, Box, Ico
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { formatDate } from '@/utils/dateFormatter';
 import { GithubFile, GithubCommit, Issue, TextMatch, GithubFileDetail, RepositoryDetails } from '@/services/githubService';
+import logger from '@/config/logging';
 
 interface RepositorySearchProps {
     type: 'files' | 'issues' | 'commits';
@@ -28,7 +29,7 @@ const RepositorySearch: React.FC<RepositorySearchProps> = ({ type, items, reposi
             const decodedContent = atob(data.content);
             setFileContent(decodedContent);
         } catch (error) {
-            console.error('Error fetching file content:', error);
+            logger.error('Error fetching file content:', error);
             setFileContent(null);
         }
     };
@@ -58,10 +59,10 @@ const RepositorySearch: React.FC<RepositorySearchProps> = ({ type, items, reposi
         for (const text_match of text_matches) {
             const fragmentStart = content.indexOf(text_match.fragment);
             if (fragmentStart === -1) {
-                console.warn(`unable to locate fragmentStart: ${text_match.fragment} in content`);
+                logger.warn(`unable to locate fragmentStart: ${text_match.fragment} in content`);
                 continue;
             }
-            console.debug(`fragmentStart: ${fragmentStart} offset from start of content`);
+            logger.debug(`fragmentStart: ${fragmentStart} offset from start of content`);
 
             for (const match of text_match.matches) {
                 matchIndex += 1;
@@ -130,19 +131,43 @@ const RepositorySearch: React.FC<RepositorySearchProps> = ({ type, items, reposi
         if (!fileContent) return;
 
         try {
+            // Start the summarization job
             const response = await fetch('/api/ai/summarize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: fileContent }),
             });
 
-            if (!response.ok) throw new Error('Failed to get AI summary');
-            const data = await response.json();
-            setAiSummary(data.summary);
+            if (!response.ok) throw new Error('Failed to start AI summary job');
+            const { jobId } = await response.json();
+
+            // Poll for the result
+            const result = await pollForSummary(jobId);
+            setAiSummary(result);
         } catch (error) {
-            console.error('Error getting AI summary:', error);
+            logger.error('Error getting AI summary:', error);
             setAiSummary('Failed to generate summary');
         }
+    };
+
+    const pollForSummary = async (jobId: string): Promise<string> => {
+        const maxAttempts = 30; // Poll for up to 30 seconds
+        for (let i = 0; i < maxAttempts; i++) {
+            const response = await fetch(`/api/ai/summarize?jobId=${jobId}`);
+            if (!response.ok) throw new Error('Failed to get summary status');
+            const data = await response.json();
+
+            if (data.status === 'completed') {
+                return data.result;
+            } else if (data.status === 'error') {
+                throw new Error(data.result);
+            }
+
+            // Wait for 1 second before the next poll
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        throw new Error('Summary generation timed out');
     };
 
     const handleAiSummaryClose = () => {

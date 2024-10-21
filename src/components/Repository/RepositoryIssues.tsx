@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { Issue } from '@/services/githubService';
 import { formatDate, calculateDuration } from '@/utils/dateFormatter';
+import logger from '@/config/logging';
 
 interface RepositoryIssuesProps {
     owner: string;
@@ -42,7 +43,7 @@ const RepositoryIssues: React.FC<RepositoryIssuesProps> = ({ owner, repo }) => {
                 setIssues(data);
             } catch (err) {
                 setError('An error occurred while fetching issues.');
-                console.error(err);
+                logger.error(err);
             } finally {
                 setLoading(false);
             }

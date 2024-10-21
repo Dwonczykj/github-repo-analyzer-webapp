@@ -7,6 +7,7 @@ import { Repository, RepositoryDetails } from '@/services/githubService';
 import RepositoryDetailsComponent from '@/components/Repository/RepositoryDetails';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ClearIcon from '@mui/icons-material/Clear';
+import logger from '@/config/logging';
 
 const qualifiers = [
   { name: 'Repository name', example: 'repo:octocat/hello-world' },
@@ -106,7 +107,7 @@ export default function Home() {
       }
     } catch (err) {
       setError('An error occurred while searching repositories.');
-      console.error(err);
+      logger.error(err);
     } finally {
       setIsSearching(false);
     }
@@ -128,7 +129,7 @@ export default function Home() {
       setSelectedRepo(data.details);
     } catch (err) {
       setError('An error occurred while fetching repository details.');
-      console.error(err);
+      logger.error(err);
     }
     setLoading(false);
   };

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { HfInference } from "@huggingface/inference";
 import Anthropic from "@anthropic-ai/sdk";
+import logger from '@/config/logging';
 import environment from "../config/environment";
 
 const openai = new OpenAI({
@@ -26,7 +27,7 @@ export async function summarizeText(text: string): Promise<string> {
 
         return openaiResponse.choices[0]?.message?.content || "Unable to generate summary.";
     } catch (error) {
-        console.error('Error in OpenAI API call:', error);
+        logger.error('Error in OpenAI API call:', error);
         throw new Error('Failed to generate summary');
     }
 }

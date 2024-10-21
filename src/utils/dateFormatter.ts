@@ -1,3 +1,4 @@
+import logger from '@/config/logging';
 export function formatDate(dateString: string | Date | undefined): string {
     if (!dateString) {
         return '';
@@ -8,7 +9,7 @@ export function formatDate(dateString: string | Date | undefined): string {
         }
         else if (typeof dateString === 'string') {
             const date = new Date(dateString);
-            console.debug(date);
+            logger.debug(date);
             return date.toLocaleString('en-US', {
                 year: 'numeric',
                 month: 'short',
@@ -28,7 +29,7 @@ export function formatDate(dateString: string | Date | undefined): string {
             });
         }
     } catch (error) {
-        console.error(`Error parsing date: ${dateString}`, error);
+        logger.error(`Error parsing date: ${dateString}`, error);
         return dateString.toString(); // Return the original string if parsing fails
     }
 }

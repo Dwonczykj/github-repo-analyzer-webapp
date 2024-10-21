@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getIssues } from '@/services/githubService'
-
+import logger from '@/config/logging';
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const owner = searchParams.get('owner')
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
         const issues = await getIssues(owner, repo, state || 'all')
         return NextResponse.json(issues)
     } catch (error) {
-        console.error('Error getting repository issues:', error)
+        logger.error('Error getting repository issues:', error)
         return NextResponse.json({ error: 'An error occurred while fetching repository issues' }, { status: 500 })
     }
 }

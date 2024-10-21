@@ -8,6 +8,7 @@ import RepositoryIssues from './RepositoryIssues';
 import RepositorySearch from './RepositorySearch';
 import { useDebounce } from 'use-debounce';
 import { formatDate } from '@/utils/dateFormatter';
+import logger from '@/config/logging';
 
 interface RepositoryDetailsProps {
     repository: RepoDetails;
@@ -86,7 +87,7 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
             const data = await response.json();
             setSearchResults(data);
         } catch (error) {
-            console.error('Error searching repository:', error);
+            logger.error('Error searching repository:', error);
         } finally {
             setExecuteSearch(false);
         }

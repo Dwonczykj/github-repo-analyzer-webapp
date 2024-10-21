@@ -5,6 +5,7 @@ import { Box, Typography, CircularProgress, Alert, Grid } from '@mui/material';
 import { formatDate } from '@/utils/dateFormatter';
 import dynamic from 'next/dynamic';
 import styled from '@emotion/styled';
+import logger from '@/config/logging';
 
 const Tree = dynamic(() => import('react-organizational-chart').then((mod) => mod.Tree), { ssr: false });
 const TreeNode = dynamic(() => import('react-organizational-chart').then((mod) => mod.TreeNode), { ssr: false });
@@ -78,7 +79,7 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
                 setIssues(data.issues || []);
                 constructBranchTree(data.branches);
             } catch (error) {
-                console.error('Error fetching repository data:', error);
+                logger.error('Error fetching repository data:', error);
                 setError('Failed to load some repository data. Charts may be incomplete.');
             } finally {
                 setLoading(false);

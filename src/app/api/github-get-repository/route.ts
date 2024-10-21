@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getRepository } from '@/services/githubService'
+import logger from '@/config/logging';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
         const repository = await getRepository(owner, repo)
         return NextResponse.json(repository)
     } catch (error) {
-        console.error('Error getting repository:', error)
+        logger.error('Error getting repository:', error)
         return NextResponse.json({ error: 'An error occurred while fetching the repository' }, { status: 500 })
     }
 }
