@@ -93,13 +93,16 @@ export default function Home() {
     setFreeText(searchQuery);
   }, []);
 
-  const handleSearch = async (page = 1) => {
+  const handleSearch = async (event?: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLInputElement>) => {
+    if (event) {
+      event.preventDefault();
+    }
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     setError(null);
     setNoResults(false);
     try {
-      const response = await fetch(`/api/repositories/search?q=${encodeURIComponent(searchQuery)}&page=${page}&per_page=30`);
+      const response = await fetch(`/api/repositories/search?q=${encodeURIComponent(searchQuery)}&page=1&per_page=30`);
       if (!response.ok) throw new Error('Failed to fetch repositories');
       const data = await response.json();
       setRepositories(data.repositories);
@@ -117,18 +120,9 @@ export default function Home() {
     }
   };
 
-  const loadMore = () => {
-    handleSearch(currentPage + 1);
-  };
-
-  const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
-
-    if (event.key === 'Enter' && searchQuery.trim()) {
-      handleSearch();
-    } else if (event.key === 'Escape') {
-      handleClearSearch();
-    } else if (event.key === 'Backspace' && searchQuery.endsWith(' :')) {
-      setShowQualifiers(false);
+  const handleKeyUp = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      handleSearch(event);
     }
   };
 
@@ -447,7 +441,23 @@ export default function Home() {
 
   const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
     setCurrentPage(value);
-    handleSearch(value);
+    loadPage(value);
+  };
+
+  const loadPage = async (page: number) => {
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/repositories/search?q=${encodeURIComponent(searchQuery)}&page=${page}&per_page=30`);
+      if (!response.ok) throw new Error('Failed to fetch repositories');
+      const data = await response.json();
+      setRepositories(data.repositories);
+      setCurrentPage(data.currentPage);
+    } catch (err) {
+      setError('An error occurred while fetching more results.');
+      logger.error(err);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -464,7 +474,7 @@ export default function Home() {
               label='Search repositories. (":" for search qualifiers...)'
               value={searchQuery}
               onChange={handleSearchQueryChange}
-              onKeyUp={handleKeyPress}
+              onKeyUp={handleKeyUp}
               inputRef={inputRef}
               title="Type ':' to see search filters"
               InputProps={{
