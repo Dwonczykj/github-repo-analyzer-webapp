@@ -1,40 +1,119 @@
-import React from 'react';
-import { List, ListItem, ListItemText, Link, Typography } from '@mui/material';
+import React, { useState, useRef, useEffect } from 'react';
+import { List, ListItemButton, ListItemText, Link, Typography, Popover, Box } from '@mui/material';
+import { formatDate } from '@/utils/dateFormatter';
+import { GithubFile, GithubCommit, Issue, TextMatch, GithubFileDetail } from '@/services/githubService';
 
 interface RepositorySearchProps {
     type: 'files' | 'issues' | 'commits';
-    items: any[];
+    items: (GithubFile | Issue | GithubCommit)[];
 }
 
 const RepositorySearch: React.FC<RepositorySearchProps> = ({ type, items }) => {
-    const renderItem = (item: any) => {
+    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+    const [selectedFile, setSelectedFile] = useState<GithubFile | null>(null);
+    const [fileContent, setFileContent] = useState<string | null>(null);
+    const contentRef = useRef<HTMLPreElement>(null);
+
+    const handleFileClick = async (event: React.MouseEvent<HTMLElement>, file: GithubFile) => {
+        setAnchorEl(event.currentTarget);
+        setSelectedFile(file);
+        try {
+            const response = await fetch(`/api/repositories/${file.repository.owner.login}/${file.repository.name}/file?url=${encodeURIComponent(file.url)}`);
+            if (!response.ok) throw new Error('Failed to fetch file content');
+            const data: GithubFileDetail = await response.json();
+            const decodedContent = atob(data.content);
+            setFileContent(decodedContent);
+        } catch (error) {
+            console.error('Error fetching file content:', error);
+            setFileContent(null);
+        }
+    };
+
+    const handlePopoverClose = () => {
+        setAnchorEl(null);
+        setSelectedFile(null);
+        setFileContent(null);
+    };
+
+    useEffect(() => {
+        if (contentRef.current && fileContent && selectedFile?.text_matches) {
+            const firstMatch = selectedFile.text_matches[0];
+            const matchStart = fileContent.indexOf(firstMatch.fragment);
+            if (matchStart !== -1) {
+                const lineHeight = 20; // Adjust this value based on your font size and line height
+                const scrollPosition = Math.max(0, matchStart * lineHeight - 100); // 100px offset from the top
+                contentRef.current.scrollTop = scrollPosition;
+            }
+        }
+    }, [fileContent, selectedFile]);
+
+    const renderHighlightedContent = (content: string, text_matches: TextMatch[]) => {
+        let lastIndex = 0;
+        let matchIndex = 0;
+        const elements: React.ReactNode[] = [];
+        for (const text_match of text_matches) {
+            const fragmentStart = content.indexOf(text_match.fragment);
+            if (fragmentStart === -1) {
+                console.warn(`unable to locate fragmentStart: ${text_match.fragment} in content`);
+                continue;
+            }
+            console.debug(`fragmentStart: ${fragmentStart} offset from start of content`);
+
+            for (const match of text_match.matches) {
+                matchIndex += 1;
+                const [_start, _end] = match.indices;
+                const start = _start + fragmentStart;
+                const end = _end + fragmentStart;
+
+                if (start > lastIndex) {
+                    elements.push(<span key={`normal-${matchIndex}`}>{content.slice(lastIndex, start)}</span>);
+                }
+                elements.push(
+                    <span key={`highlight-${matchIndex}`} style={{ backgroundColor: 'rgba(64, 224, 208, 0.5)' }}>
+                        {content.slice(start, end)}
+                    </span>
+                );
+                lastIndex = end;
+            }
+
+            if (lastIndex < content.length) {
+                elements.push(<span key="normal-last">{content.slice(lastIndex)}</span>);
+            }
+        }
+        return elements;
+    };
+
+    const renderItem = (item: GithubFile | Issue | GithubCommit) => {
         switch (type) {
             case 'files':
+                const file = item as GithubFile;
                 return (
-                    <ListItem key={item.sha}>
+                    <ListItemButton key={file.sha} onClick={(e) => handleFileClick(e, file)}>
                         <ListItemText
-                            primary={<Link href={item.html_url} target="_blank" rel="noopener noreferrer">{item.path}</Link>}
-                            secondary={`Last updated: ${new Date(item.repository.updated_at).toLocaleDateString()}`}
+                            primary={<Link href={file.html_url} target="_blank" rel="noopener noreferrer">{file.path}</Link>}
+                            secondary={`Last updated: ${formatDate(file.repository.updated_at)}`}
                         />
-                    </ListItem>
+                    </ListItemButton>
                 );
             case 'issues':
+                const issue = item as Issue;
                 return (
-                    <ListItem key={item.id}>
+                    <ListItemButton key={issue.id}>
                         <ListItemText
-                            primary={<Link href={item.html_url} target="_blank" rel="noopener noreferrer">{item.title}</Link>}
-                            secondary={`#${item.number} opened on ${new Date(item.created_at).toLocaleDateString()} by ${item.user.login}`}
+                            primary={<Link href={issue.html_url} target="_blank" rel="noopener noreferrer">{issue.title}</Link>}
+                            secondary={`#${issue.number} opened on ${formatDate(issue.created_at)} by ${issue.user.login}`}
                         />
-                    </ListItem>
+                    </ListItemButton>
                 );
             case 'commits':
+                const commit = item as GithubCommit;
                 return (
-                    <ListItem key={item.sha}>
+                    <ListItemButton key={commit.sha}>
                         <ListItemText
-                            primary={<Link href={item.html_url} target="_blank" rel="noopener noreferrer">{item.commit.message}</Link>}
-                            secondary={`${item.sha.substring(0, 7)} committed on ${new Date(item.commit.author.date).toLocaleDateString()} by ${item.commit.author.name}`}
+                            primary={<Link href={commit.html_url} target="_blank" rel="noopener noreferrer">{commit.commit.message}</Link>}
+                            secondary={`${commit.sha.substring(0, 7)} committed on ${formatDate(commit.commit.author.date)} by ${commit.commit.author.name}`}
                         />
-                    </ListItem>
+                    </ListItemButton>
                 );
             default:
                 return null;
@@ -42,13 +121,43 @@ const RepositorySearch: React.FC<RepositorySearchProps> = ({ type, items }) => {
     };
 
     return (
-        <List>
-            {items.length > 0 ? (
-                items.map(renderItem)
-            ) : (
-                <Typography>No results found.</Typography>
-            )}
-        </List>
+        <>
+            <List>
+                {items.length > 0 ? (
+                    items.map(renderItem)
+                ) : (
+                    <Typography>No results found.</Typography>
+                )}
+            </List>
+            <Popover
+                open={Boolean(anchorEl)}
+                anchorEl={anchorEl}
+                onClose={handlePopoverClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'left',
+                }}
+            >
+                {selectedFile && (
+                    <Box sx={{ p: 2, maxWidth: 600, maxHeight: 400, overflow: 'auto' }}>
+                        <Typography variant="h6" gutterBottom>
+                            {selectedFile.path}
+                        </Typography>
+                        <pre ref={contentRef} style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontFamily: 'monospace', fontSize: '12px' }}>
+                            {fileContent ? (
+                                renderHighlightedContent(fileContent, selectedFile.text_matches || [])
+                            ) : (
+                                'Loading file content...'
+                            )}
+                        </pre>
+                    </Box>
+                )}
+            </Popover>
+        </>
     );
 };
 

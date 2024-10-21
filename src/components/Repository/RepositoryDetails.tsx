@@ -6,6 +6,7 @@ import RepositoryVisualizations from './RepositoryVisualizations';
 import RepositoryIssues from './RepositoryIssues';
 import RepositorySearch from './RepositorySearch';
 import { useDebounce } from 'use-debounce';
+import { formatDate } from '@/utils/dateFormatter';
 
 interface RepositoryDetailsProps {
     repository: RepoDetails;
@@ -160,11 +161,11 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                     </Box>
                     <Box display="flex" alignItems="center" mb={1}>
                         <Schedule sx={{ mr: 1 }} />
-                        <Typography variant="body2">Created: {new Date(repository.created_at).toLocaleDateString()}</Typography>
+                        <Typography variant="body2">Created: {formatDate(repository.created_at)}</Typography>
                     </Box>
                     <Box display="flex" alignItems="center" mb={1}>
                         <Update sx={{ mr: 1 }} />
-                        <Typography variant="body2">Updated: {new Date(repository.updated_at).toLocaleDateString()}</Typography>
+                        <Typography variant="body2">Updated: {formatDate(repository.updated_at)}</Typography>
                     </Box>
                 </Grid>
                 <Grid item xs={12} md={4}>

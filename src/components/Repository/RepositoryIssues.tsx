@@ -4,6 +4,7 @@ import {
     Typography, CircularProgress, Link, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import { Issue } from '@/services/githubService';
+import { formatDate } from '@/utils/dateFormatter';
 
 interface RepositoryIssuesProps {
     owner: string;
@@ -82,8 +83,8 @@ const RepositoryIssues: React.FC<RepositoryIssuesProps> = ({ owner, repo }) => {
                                     </Link>
                                 </TableCell>
                                 <TableCell>{issue.state}</TableCell>
-                                <TableCell>{new Date(issue.created_at).toLocaleDateString()}</TableCell>
-                                <TableCell>{new Date(issue.updated_at).toLocaleDateString()}</TableCell>
+                                <TableCell>{formatDate(issue.created_at)}</TableCell>
+                                <TableCell>{formatDate(issue.updated_at)}</TableCell>
                                 <TableCell>{issue.comments}</TableCell>
                             </TableRow>
                         ))}

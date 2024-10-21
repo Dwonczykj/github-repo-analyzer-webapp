@@ -7,6 +7,17 @@ interface SearchResultsProps {
     onRepoSelect: (repo: Repository) => void;
 }
 
+function formatDate(isoString: string): string {
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
 const SearchResults: React.FC<SearchResultsProps> = ({ repositories, onRepoSelect }) => {
     return (
         <Box>
@@ -21,7 +32,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ repositories, onRepoSelec
                                         <Typography component="span" variant="body2" color="textPrimary">
                                             {repo.description}
                                         </Typography>
-                                        {` — Stars: ${repo.stargazers_count}, Forks: ${repo.forks_count}`}
+                                        {` — Stars: ${repo.stargazers_count}, Forks: ${repo.forks_count}, Language: ${repo.language}, Updated: ${formatDate(repo.updated_at)}` + (repo.topics.length > 0 ? `, Topics: ${repo.topics.join(', ')}` : '')}
                                     </React.Fragment>
                                 }
                             />

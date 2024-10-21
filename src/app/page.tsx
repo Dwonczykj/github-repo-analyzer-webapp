@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, KeyboardEvent, useRef, useEffect } from 'react';
-import { Container, Typography, TextField, Button, Box, Popper, Paper, List, ListItemButton, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Chip, Autocomplete, FormControlLabel, Switch, IconButton, InputAdornment } from '@mui/material';
+import { Container, Typography, TextField, Button, Box, Popper, Paper, List, ListItemButton, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Chip, Autocomplete, FormControlLabel, Switch, IconButton, InputAdornment, CircularProgress } from '@mui/material';
 import SearchResults from '@/components/Search/SearchResults';
 import { Repository, RepositoryDetails } from '@/services/githubService';
 import RepositoryDetailsComponent from '@/components/Repository/RepositoryDetails';
@@ -71,6 +71,8 @@ export default function Home() {
   const [symbolQualifier, setSymbolQualifier] = useState('');
   const [isSymbolRegex, setIsSymbolRegex] = useState(false);
   const [freeText, setFreeText] = useState('');
+  const [noResults, setNoResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     if (searchQuery.endsWith(' :') || searchQuery === (':')) {
@@ -88,8 +90,9 @@ export default function Home() {
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    setLoading(true);
+    setIsSearching(true);
     setError(null);
+    setNoResults(false);
     try {
       const response = await fetch(`/api/repositories/search?q=${encodeURIComponent(searchQuery)}`);
       if (!response.ok) throw new Error('Failed to fetch repositories');
@@ -98,11 +101,15 @@ export default function Home() {
       if (data.error) {
         setError(data.error.message);
       }
+      if (data.message === 'No results found') {
+        setNoResults(true);
+      }
     } catch (err) {
       setError('An error occurred while searching repositories.');
       console.error(err);
+    } finally {
+      setIsSearching(false);
     }
-    setLoading(false);
   };
 
   const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -446,8 +453,13 @@ export default function Home() {
                 ),
               }}
             />
-            <Button variant="contained" onClick={handleSearch} disabled={loading || !searchQuery.trim()} sx={{ ml: 1 }}>
-              Search
+            <Button
+              variant="contained"
+              onClick={handleSearch}
+              disabled={isSearching || !searchQuery.trim()}
+              sx={{ ml: 1, minWidth: '100px' }}
+            >
+              {isSearching ? <CircularProgress size={24} color="inherit" /> : 'Search'}
             </Button>
           </Box>
           <Button variant="outlined" onClick={() => setShowAdvancedSearch(true)} sx={{ alignSelf: 'flex-start' }}>
@@ -474,8 +486,10 @@ export default function Home() {
           {error}
         </Typography>
       )}
-      {loading ? (
-        <Typography>Loading...</Typography>
+      {isSearching ? (
+        <Box display="flex" justifyContent="center" mt={4}>
+          <CircularProgress />
+        </Box>
       ) : (
         <>
           {selectedRepo ? (
@@ -490,6 +504,8 @@ export default function Home() {
               </Button>
               <RepositoryDetailsComponent repository={selectedRepo} />
             </>
+          ) : noResults ? (
+            <Typography>No results found</Typography>
           ) : (
             <SearchResults repositories={repositories} onRepoSelect={handleRepoSelect} />
           )}

@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic';
 import { RepositoryDetails, GitHubFork } from '@/services/githubService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
+import { formatDate } from '@/utils/dateFormatter';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
@@ -83,7 +84,7 @@ const RepositoryVisualizations: React.FC<RepositoryVisualizationsProps> = ({ rep
     }
 
     const commitData = commits.map((commit) => ({
-        date: new Date(commit.commit.author.date).toLocaleDateString(),
+        date: formatDate(commit.commit.author.date),
         linesChanged: commit.stats ? commit.stats.total : 0,
     })).reverse();
 

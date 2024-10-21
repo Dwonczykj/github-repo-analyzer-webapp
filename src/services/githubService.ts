@@ -231,6 +231,8 @@ export class GitHubService {
     static getIssues = serverSideOnly(async (owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'all'): Promise<Issue[]> => {
         const response = await githubApi.get(`/repos/${owner}/${repo}/issues`, {
             params: { state },
+            // headers: { 'Accept': 'vnd.github.text-match+json' }
+            headers: { 'Accept': 'application/vnd.github.v3+json' }
         });
         return response.data;
     });
@@ -283,9 +285,9 @@ export class GitHubService {
 
     static searchRepository = serverSideOnly(async (owner: string, repo: string, query: string): Promise<{ files: any[], issues: any[], commits: any[] }> => {
         const [filesResponse, issuesResponse, commitsResponse] = await Promise.all([
-            githubApi.get(`/search/code`, { params: { q: `repo:${owner}/${repo} ${query}` } }),
-            githubApi.get(`/search/issues`, { params: { q: `repo:${owner}/${repo} ${query}` } }),
-            githubApi.get(`/search/commits`, { params: { q: `repo:${owner}/${repo} ${query}` } }),
+            githubApi.get(`/search/code`, { params: { q: `repo:${owner}/${repo} ${query}` }, headers: { 'Accept': 'application/vnd.github.text-match+json' } }),
+            githubApi.get(`/search/issues`, { params: { q: `repo:${owner}/${repo} ${query}` }, headers: { 'Accept': 'application/vnd.github.text-match+json' } }),
+            githubApi.get(`/search/commits`, { params: { q: `repo:${owner}/${repo} ${query}` }, headers: { 'Accept': 'application/vnd.github.text-match+json' } }),
         ]);
 
         return {
@@ -293,6 +295,11 @@ export class GitHubService {
             issues: issuesResponse.data.items,
             commits: commitsResponse.data.items,
         };
+    });
+
+    static getFileContent = serverSideOnly(async (url: string): Promise<GithubFileDetail> => {
+        const response = await githubApi.get(url);
+        return response.data;
     });
 }
 
@@ -306,21 +313,84 @@ export const {
     getRepositoryCommits,
     getRepositoryBranches,
     getRepositoryForks,
-    searchRepository
+    searchRepository,
+    getFileContent
 } = GitHubService;
 
 // Add these interfaces if they're not already defined
+
+export interface TextMatch {
+    object_url: string;
+    object_type: string;
+    property: string;
+    fragment: string;
+    matches: Array<{
+        indices: [number, number];
+        text: string;
+    }>;
+}
 export interface Issue {
-    // Define the structure of an Issue
+    url: string;
+    repository_url: string;
+    labels_url: string;
+    comments_url: string;
+    events_url: string;
+    html_url: string;
     id: number;
+    node_id: string;
     number: number;
     title: string;
+    user: {
+        login: string;
+        id: number;
+        node_id: string;
+        avatar_url: string;
+        gravatar_id: string;
+        url: string;
+        html_url: string;
+        followers_url: string;
+        following_url: string;
+        gists_url: string;
+        starred_url: string;
+        subscriptions_url: string;
+        organizations_url: string;
+        repos_url: string;
+        events_url: string;
+        received_events_url: string;
+        type: string;
+        user_view_type: string;
+        site_admin: boolean;
+    };
+    labels: any[]; // You can define a more specific type if needed
     state: 'open' | 'closed';
+    locked: boolean;
+    assignee: null | object; // You can define a more specific type if needed
+    assignees: any[]; // You can define a more specific type if needed
+    milestone: null | object; // You can define a more specific type if needed
+    comments: number;
     created_at: string;
     updated_at: string;
-    html_url: string;
-    comments: string;
-    // Add other properties as needed
+    closed_at: string | null;
+    author_association: string;
+    active_lock_reason: string | null;
+    body: string;
+    closed_by: null | object; // You can define a more specific type if needed
+    reactions: {
+        url: string;
+        total_count: number;
+        '+1': number;
+        '-1': number;
+        laugh: number;
+        hooray: number;
+        confused: number;
+        heart: number;
+        rocket: number;
+        eyes: number;
+    };
+    timeline_url: string;
+    performed_via_github_app: null | object; // You can define a more specific type if needed
+    state_reason: string | null;
+    text_matches: Array<TextMatch> | undefined;
 }
 
 export interface GitHubFork {
@@ -340,4 +410,72 @@ export interface GitHubFork {
 interface SearchError {
     message: string;
     type: 'rate_limit' | 'query_length' | 'query_operators' | 'validation_failed' | 'unknown';
+}
+
+export interface GithubFile {
+    name: string;
+    path: string;
+    sha: string;
+    url: string;
+    git_url: string;
+    html_url: string;
+    repository: Repository;
+    score: number;
+    text_matches: Array<TextMatch> | undefined;
+}
+
+export interface GithubCommit {
+    url: string;
+    sha: string;
+    node_id: string;
+    html_url: string;
+    comments_url: string;
+    commit: {
+        url: string;
+        author: {
+            date: string;
+            name: string;
+            email: string;
+        };
+        committer: {
+            date: string;
+            name: string;
+            email: string;
+        };
+        message: string;
+        tree: {
+            url: string;
+            sha: string;
+        };
+        comment_count: number;
+    };
+    author: Repository['owner'];
+    committer: Repository['owner'];
+    parents: Array<{
+        url: string;
+        html_url: string;
+        sha: string;
+    }>;
+    repository: Repository;
+    score: number;
+    text_matches: Array<TextMatch> | undefined;
+}
+
+export interface GithubFileDetail {
+    name: string;
+    path: string;
+    sha: string;
+    size: number;
+    url: string;
+    html_url: string;
+    git_url: string;
+    download_url: string;
+    type: string;
+    content: string;
+    encoding: string;
+    _links: {
+        self: string;
+        git: string;
+        html: string;
+    };
 }
