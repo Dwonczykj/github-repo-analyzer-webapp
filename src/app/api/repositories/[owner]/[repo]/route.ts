@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRepositoryDetails, getRepositoryCommits, getRepositoryBranches, getRepositoryForks } from '@/services/githubService';
+import { getRepositoryDetails, getRepositoryCommits, getRepositoryBranches, getRepositoryForks, getIssues } from '@/services/githubService';
 import logger from '@/config/logging';
 
 export async function GET(
@@ -9,14 +9,15 @@ export async function GET(
     const { owner, repo } = params;
 
     try {
-        const [details, commits, branches, forks] = await Promise.all([
+        const [details, commits, branches, forks, issues] = await Promise.all([
             getRepositoryDetails(owner, repo),
             getRepositoryCommits(owner, repo),
             getRepositoryBranches(owner, repo),
-            getRepositoryForks(owner, repo)
+            getRepositoryForks(owner, repo),
+            getIssues(owner, repo, 'all')
         ]);
 
-        return NextResponse.json({ details, commits, branches, forks });
+        return NextResponse.json({ details, commits, branches, forks, issues });
     } catch (error) {
         logger.error(`Error fetching repository data for ${owner}/${repo}:`, error);
 

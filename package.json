@@ -35,6 +35,7 @@
     "react-dom": "^18",
     "react-force-graph": "^1.44.6",
     "react-force-graph-2d": "^1.25.7",
+    "react-organizational-chart": "^2.2.1",
     "react-query": "^3.39.3",
     "recharts": "^2.13.0",
     "sass": "^1.80.3",

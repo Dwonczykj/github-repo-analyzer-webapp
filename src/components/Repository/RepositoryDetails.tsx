@@ -1,6 +1,7 @@
 import React, { useState, KeyboardEvent, useEffect } from 'react';
 import { RepositoryDetails as RepoDetails } from '@/services/githubService';
-import { Box, Typography, Paper, Grid, Chip, Link, Button, Dialog, DialogContent, DialogTitle, TextField, Tabs, Tab, Autocomplete } from '@mui/material';
+import { Box, Typography, Paper, Chip, Link, Button, Dialog, DialogContent, DialogTitle, TextField, Tabs, Tab, Autocomplete, CircularProgress } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import { Star, ForkRight, BugReport, Code, Schedule, Update, Link as LinkIcon, Person, Search } from '@mui/icons-material';
 import RepositoryVisualizations from './RepositoryVisualizations';
 import RepositoryIssues from './RepositoryIssues';
@@ -173,9 +174,9 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                     variant="contained"
                     onClick={() => setExecuteSearch(true)}
                     sx={{ mt: 1 }}
-                    disabled={searchQuery.trim() === ''}
+                    disabled={executeSearch || searchQuery.trim() === ''}
                 >
-                    <Search />
+                    {executeSearch ? <CircularProgress size={24} color="inherit" /> : <Search />}
                 </Button>
             </Box>
 
@@ -188,19 +189,19 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                         <Tab label={`Commits (${searchResults.commits.length})`} />
                     </Tabs>
                     <TabPanel value={tabValue} index={0}>
-                        <RepositorySearch type="files" items={searchResults.files} />
+                        <RepositorySearch type="files" items={searchResults.files} repository={repository} />
                     </TabPanel>
                     <TabPanel value={tabValue} index={1}>
-                        <RepositorySearch type="issues" items={searchResults.issues} />
+                        <RepositorySearch type="issues" items={searchResults.issues} repository={repository} />
                     </TabPanel>
                     <TabPanel value={tabValue} index={2}>
-                        <RepositorySearch type="commits" items={searchResults.commits} />
+                        <RepositorySearch type="commits" items={searchResults.commits} repository={repository} />
                     </TabPanel>
                 </Box>
             )}
 
             <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                     <Box display="flex" alignItems="center" mb={1}>
                         <Star sx={{ mr: 1 }} />
                         <Typography variant="body2">{repository.stargazers_count} Stars</Typography>
@@ -216,7 +217,7 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                         </Button>
                     </Box>
                 </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                     <Box display="flex" alignItems="center" mb={1}>
                         <Code sx={{ mr: 1 }} />
                         <Typography variant="body2">Language: {repository.language || 'Not specified'}</Typography>
@@ -230,7 +231,7 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                         <Typography variant="body2">Updated: {formatDate(repository.updated_at)}</Typography>
                     </Box>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                     {repository.license && (
                         <Chip label={`License: ${repository.license.name}`} sx={{ mb: 1 }} />
                     )}

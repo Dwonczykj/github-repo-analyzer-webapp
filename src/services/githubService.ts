@@ -410,17 +410,60 @@ export interface Issue {
 }
 
 export interface GitHubFork {
-    // Define the structure of a GitHubFork
     id: number;
+    node_id: string;
     name: string;
     full_name: string;
+    private: boolean;
     owner: {
         login: string;
         id: number;
+        node_id: string;
         avatar_url: string;
+        gravatar_id: string;
+        url: string;
+        html_url: string;
+        type: string;
+        site_admin: boolean;
     };
-    // Add other properties as needed
+    html_url: string;
+    description: string | null;
+    fork: boolean;
+    url: string;
+    created_at: string;
+    updated_at: string;
+    pushed_at: string;
+    homepage: string | null;
+    size: number;
     stargazers_count: number;
+    watchers_count: number;
+    language: string | null;
+    forks_count: number;
+    open_issues_count: number;
+    master_branch?: string;
+    default_branch: string;
+    score: number;
+    archived: boolean;
+    disabled: boolean;
+    license: {
+        key: string;
+        name: string;
+        spdx_id: string;
+        url: string;
+        node_id: string;
+    } | null;
+    forks: number;
+    open_issues: number;
+    watchers: number;
+    topics: string[];
+    visibility: string;
+    permissions?: {
+        admin: boolean;
+        maintain: boolean;
+        push: boolean;
+        triage: boolean;
+        pull: boolean;
+    };
 }
 
 interface SearchError {
