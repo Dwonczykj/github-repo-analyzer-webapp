@@ -7,7 +7,7 @@ const anthropic = new Anthropic({
 });
 
 // Use a simple in-memory store for demo purposes
-// In a production app, use a database or cache service
+// In a production app, use a database or cache service, this is a demo for Niel
 const summaryJobs: { [key: string]: { status: 'pending' | 'completed' | 'error', result?: string } } = {};
 
 export async function POST(request: NextRequest) {
