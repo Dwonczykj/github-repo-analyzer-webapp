@@ -13,22 +13,27 @@ const anthropic = new Anthropic({
     apiKey: environment.anthropic.apiKey,
 });
 
-export async function generateSummary(text: string) {
-    // OpenAI example
-    const openaiResponse = await openai.chat.completions.create({
-        model: environment.openai.model || "text-davinci-002",
-        prompt: `Summarize the following: ${text}`,
-        max_tokens: 100,
-    });
+export async function summarizeText(text: string): Promise<string> {
+    try {
+        const openaiResponse = await openai.chat.completions.create({
+            model: environment.openai.model || "gpt-3.5-turbo",
+            messages: [
+                { role: "system", content: "You are a helpful assistant that summarizes text." },
+                { role: "user", content: `Summarize the following: ${text}` }
+            ],
+            max_tokens: 100,
+        });
 
-    // Use other AI services similarly...
-
-    return openaiResponse.data.choices[0].text;
+        return openaiResponse.choices[0]?.message?.content || "Unable to generate summary.";
+    } catch (error) {
+        console.error('Error in OpenAI API call:', error);
+        throw new Error('Failed to generate summary');
+    }
 }
 
 // Add other AI-related functions here...
 
 export default {
-    generateSummary,
+    summarizeText,
     // other functions...
 };

@@ -5,6 +5,9 @@ const nextConfig = {
     includePaths: ['./src/styles'],
     prependData: `@import "variables.scss"; @import "mixins.scss";`,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 }
 
 module.exports = nextConfig

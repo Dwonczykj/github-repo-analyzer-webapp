@@ -1,13 +1,13 @@
 import axios, { AxiosError } from 'axios';
 import logger from '@/config/logging';
 
-function serverSideOnly<T extends (...args: any[]) => ReturnType<T>>(fn: T): T {
+function serverSideOnly<T extends (...args: any[]) => any>(fn: T): T {
     const wrappedFunction = ((...args: Parameters<T>): ReturnType<T> => {
         if (typeof window !== 'undefined') {
             throw new Error(`${fn.name} can only be called on the server side.`);
         }
         return fn(...args);
-    }) as any as T;
+    }) as T;
 
     return wrappedFunction;
 }
@@ -164,7 +164,7 @@ const filterRepositoriesByRegex = (repositories: Repository[], pattern: string):
 };
 
 export class GitHubService {
-    static async searchRepositoriesWithRegex(query: string, page: number = 1, perPage: number = 30): Promise<{ repositories: Repository[], totalCount: number, error?: SearchError }> {
+    static async searchRepositoriesWithRegex(query: string, page = 1, perPage = 30): Promise<{ repositories: Repository[], totalCount: number, error?: SearchError }> {
         try {
             // Check query length
             if (query.length > 256) {
@@ -231,7 +231,6 @@ export class GitHubService {
     static getIssues = serverSideOnly(async (owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'all'): Promise<Issue[]> => {
         const response = await githubApi.get(`/repos/${owner}/${repo}/issues`, {
             params: { state },
-            // headers: { 'Accept': 'vnd.github.text-match+json' }
             headers: { 'Accept': 'application/vnd.github.v3+json' }
         });
         return response.data;
@@ -249,7 +248,7 @@ export class GitHubService {
         }
     });
 
-    static getRepositoryCommits = serverSideOnly(async (owner: string, repo: string): Promise<any[]> => {
+    static getRepositoryCommits = serverSideOnly(async (owner: string, repo: string): Promise<GithubCommit[]> => {
         const response = await githubApi.get(`/repos/${owner}/${repo}/commits`, {
             params: {
                 per_page: 100 // Fetch up to 100 commits
@@ -257,7 +256,7 @@ export class GitHubService {
         });
 
         // Fetch detailed stats for each commit
-        const detailedCommits = await Promise.all(response.data.map(async (commit: any) => {
+        const detailedCommits = await Promise.all(response.data.map(async (commit: GithubCommit) => {
             const detailedResponse = await githubApi.get(`/repos/${owner}/${repo}/commits/${commit.sha}`);
             return {
                 ...commit,
@@ -268,7 +267,7 @@ export class GitHubService {
         return detailedCommits;
     });
 
-    static getRepositoryBranches = serverSideOnly(async (owner: string, repo: string): Promise<any[]> => {
+    static getRepositoryBranches = serverSideOnly(async (owner: string, repo: string): Promise<unknown[]> => {
         const response = await githubApi.get(`/repos/${owner}/${repo}/branches`);
         return response.data;
     });
@@ -283,7 +282,7 @@ export class GitHubService {
         }
     });
 
-    static searchRepository = serverSideOnly(async (owner: string, repo: string, query: string): Promise<{ files: any[], issues: any[], commits: any[] }> => {
+    static searchRepository = serverSideOnly(async (owner: string, repo: string, query: string): Promise<{ files: GithubFile[], issues: Issue[], commits: GithubCommit[] }> => {
         const baseQuery = query.replace(/\blanguage:\S+/g, '').trim();
         const languageQuery = query.match(/\blanguage:\S+/g)?.[0] || '';
 

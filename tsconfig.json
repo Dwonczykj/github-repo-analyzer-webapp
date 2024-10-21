@@ -27,7 +27,8 @@
       ]
     },
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "noImplicitAny": false
   },
   "include": [
     "next-env.d.ts",

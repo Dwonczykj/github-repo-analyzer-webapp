@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "next lint --max-warnings 0",
     "prepare": "husky",
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
