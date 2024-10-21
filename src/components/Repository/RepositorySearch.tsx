@@ -91,7 +91,7 @@ const RepositorySearch: React.FC<RepositorySearchProps> = ({ type, items }) => {
                     <ListItemButton key={file.sha} onClick={(e) => handleFileClick(e, file)}>
                         <ListItemText
                             primary={<Link href={file.html_url} target="_blank" rel="noopener noreferrer">{file.path}</Link>}
-                            secondary={`Last updated: ${formatDate(file.repository.updated_at)}`}
+                            secondary={`Matches: ${file.text_matches?.flatMap(m => m.matches.length).reduce((a, b) => a + b, 0)}`}
                         />
                     </ListItemButton>
                 );

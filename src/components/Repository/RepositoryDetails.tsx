@@ -1,6 +1,6 @@
 import React, { useState, KeyboardEvent, useEffect } from 'react';
 import { RepositoryDetails as RepoDetails } from '@/services/githubService';
-import { Box, Typography, Paper, Grid, Chip, Link, Button, Dialog, DialogContent, DialogTitle, TextField, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Paper, Grid, Chip, Link, Button, Dialog, DialogContent, DialogTitle, TextField, Tabs, Tab, Autocomplete } from '@mui/material';
 import { Star, ForkRight, BugReport, Code, Schedule, Update, Link as LinkIcon, Person, Search } from '@mui/icons-material';
 import RepositoryVisualizations from './RepositoryVisualizations';
 import RepositoryIssues from './RepositoryIssues';
@@ -45,6 +45,9 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
     const [executeSearch, setExecuteSearch] = useState(false);
     const [searchResults, setSearchResults] = useState<any>(null);
     const [tabValue, setTabValue] = useState(0);
+    const [languageChips, setLanguageChips] = useState<string[]>([]);
+    const [languageInput, setLanguageInput] = useState('');
+    const [debouncedLanguageChips] = useDebounce(languageChips, 500);
 
     const handleOpenIssuesDialog = () => {
         setIsIssuesDialogOpen(true);
@@ -55,16 +58,16 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
     };
 
     useEffect(() => {
-        if (debouncedSearchQuery) {
+        if (debouncedSearchQuery || (debouncedLanguageChips.length > 0 && searchQuery.trim() !== '')) {
             setExecuteSearch(true);
         }
-    }, [debouncedSearchQuery]);
+    }, [debouncedSearchQuery, debouncedLanguageChips, searchQuery]);
 
     useEffect(() => {
-        if (executeSearch) {
+        if (executeSearch && searchQuery.trim() !== '') {
             performSearch();
         }
-    }, [executeSearch]);
+    }, [executeSearch, searchQuery]);
 
     const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Enter') {
@@ -73,8 +76,11 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
     };
 
     const performSearch = async () => {
+        if (searchQuery.trim() === '') return;
         try {
-            const response = await fetch(`/api/repositories/${repository.owner.login}/${repository.name}/search?q=${encodeURIComponent(debouncedSearchQuery)}`);
+            const languageQuery = debouncedLanguageChips.length > 0 ? `language:${debouncedLanguageChips.join(' OR language:')}` : '';
+            const fullQuery = `${debouncedSearchQuery} ${languageQuery}`.trim();
+            const response = await fetch(`/api/repositories/${repository.owner.login}/${repository.name}/search?q=${encodeURIComponent(fullQuery)}`);
             if (!response.ok) throw new Error('Failed to search repository');
             const data = await response.json();
             setSearchResults(data);
@@ -89,6 +95,28 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
         setTabValue(newValue);
     };
 
+    const handleLanguageChipChange = (event: React.SyntheticEvent, newValue: string[]) => {
+        setLanguageChips(newValue);
+    };
+
+    const handleLanguageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setLanguageInput(event.target.value);
+    };
+
+    const handleLanguageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === ' ' && languageInput.trim()) {
+            event.preventDefault();
+            addLanguageChip(languageInput.trim());
+        }
+    };
+
+    const addLanguageChip = (newChip: string) => {
+        if (!languageChips.includes(newChip)) {
+            setLanguageChips([...languageChips, newChip]);
+        }
+        setLanguageInput('');
+    };
+
     return (
         <Paper elevation={3} sx={{ p: 3, mt: 3 }}>
             <Link href={repository.html_url} target="_blank" rel="noopener noreferrer" color="inherit" underline="hover">
@@ -100,7 +128,7 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                 {repository.description}
             </Typography>
 
-            <Box display="flex" mb={2}>
+            <Box display="flex" flexDirection="column" mb={2}>
                 <TextField
                     fullWidth
                     variant="outlined"
@@ -112,7 +140,41 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                         startAdornment: <Typography color="textSecondary" sx={{ mr: 1 }}>{`repo:${repository.full_name}`}</Typography>
                     }}
                 />
-                <Button variant="contained" onClick={() => setExecuteSearch(true)} sx={{ ml: 1 }}>
+                <Autocomplete
+                    multiple
+                    freeSolo
+                    options={[]}
+                    renderTags={(value: string[], getTagProps) =>
+                        value.map((option: string, index: number) => (
+                            <Chip variant="outlined" label={option} {...getTagProps({ index })} />
+                        ))
+                    }
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            variant="outlined"
+                            label="Language qualifier"
+                            placeholder="Type a language and press space"
+                            fullWidth
+                            margin="normal"
+                            value={languageInput}
+                            onChange={handleLanguageInputChange}
+                            onKeyDown={handleLanguageKeyDown}
+                        />
+                    )}
+                    value={languageChips}
+                    onChange={handleLanguageChipChange}
+                    inputValue={languageInput}
+                    onInputChange={(event, newInputValue) => {
+                        setLanguageInput(newInputValue);
+                    }}
+                />
+                <Button
+                    variant="contained"
+                    onClick={() => setExecuteSearch(true)}
+                    sx={{ mt: 1 }}
+                    disabled={searchQuery.trim() === ''}
+                >
                     <Search />
                 </Button>
             </Box>

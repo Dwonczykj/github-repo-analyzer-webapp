@@ -284,10 +284,26 @@ export class GitHubService {
     });
 
     static searchRepository = serverSideOnly(async (owner: string, repo: string, query: string): Promise<{ files: any[], issues: any[], commits: any[] }> => {
+        const baseQuery = query.replace(/\blanguage:\S+/g, '').trim();
+        const languageQuery = query.match(/\blanguage:\S+/g)?.[0] || '';
+
+        if (!baseQuery) {
+            return { files: [], issues: [], commits: [] };
+        }
+
         const [filesResponse, issuesResponse, commitsResponse] = await Promise.all([
-            githubApi.get(`/search/code`, { params: { q: `repo:${owner}/${repo} ${query}` }, headers: { 'Accept': 'application/vnd.github.text-match+json' } }),
-            githubApi.get(`/search/issues`, { params: { q: `repo:${owner}/${repo} ${query}` }, headers: { 'Accept': 'application/vnd.github.text-match+json' } }),
-            githubApi.get(`/search/commits`, { params: { q: `repo:${owner}/${repo} ${query}` }, headers: { 'Accept': 'application/vnd.github.text-match+json' } }),
+            githubApi.get(`/search/code`, {
+                params: { q: `repo:${owner}/${repo} ${baseQuery} ${languageQuery}`.trim() },
+                headers: { 'Accept': 'application/vnd.github.text-match+json' }
+            }),
+            githubApi.get(`/search/issues`, {
+                params: { q: `repo:${owner}/${repo} ${baseQuery}`.trim() },
+                headers: { 'Accept': 'application/vnd.github.text-match+json' }
+            }),
+            githubApi.get(`/search/commits`, {
+                params: { q: `repo:${owner}/${repo} ${baseQuery}`.trim() },
+                headers: { 'Accept': 'application/vnd.github.text-match+json' }
+            }),
         ]);
 
         return {
@@ -479,3 +495,4 @@ export interface GithubFileDetail {
         html: string;
     };
 }
+
