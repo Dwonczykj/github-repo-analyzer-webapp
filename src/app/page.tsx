@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, KeyboardEvent, useRef, useEffect } from 'react';
-import { Container, Typography, TextField, Button, Box, Popper, Paper, List, ListItemButton, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Chip, Autocomplete, FormControlLabel, Switch, IconButton, InputAdornment, CircularProgress } from '@mui/material';
+import { Container, Typography, TextField, Button, Box, Popper, Paper, List, ListItemButton, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Chip, Autocomplete, FormControlLabel, Switch, IconButton, InputAdornment, CircularProgress, Backdrop, Pagination } from '@mui/material';
 import SearchResults from '@/components/Search/SearchResults';
 import { Repository, RepositoryDetails } from '@/services/githubService';
 import RepositoryDetailsComponent from '@/components/Repository/RepositoryDetails';
@@ -74,6 +74,10 @@ export default function Home() {
   const [freeText, setFreeText] = useState('');
   const [noResults, setNoResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     if (searchQuery.endsWith(' :') || searchQuery === (':')) {
@@ -89,20 +93,20 @@ export default function Home() {
     setFreeText(searchQuery);
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearch = async (page = 1) => {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     setError(null);
     setNoResults(false);
     try {
-      const response = await fetch(`/api/repositories/search?q=${encodeURIComponent(searchQuery)}`);
+      const response = await fetch(`/api/repositories/search?q=${encodeURIComponent(searchQuery)}&page=${page}&per_page=30`);
       if (!response.ok) throw new Error('Failed to fetch repositories');
       const data = await response.json();
       setRepositories(data.repositories);
-      if (data.error) {
-        setError(data.error.message);
-      }
-      if (data.message === 'No results found') {
+      setTotalCount(data.totalCount);
+      setCurrentPage(data.currentPage);
+      setTotalPages(Math.ceil(data.totalCount / 30)); // Assuming 30 items per page
+      if (data.repositories.length === 0) {
         setNoResults(true);
       }
     } catch (err) {
@@ -113,9 +117,18 @@ export default function Home() {
     }
   };
 
+  const loadMore = () => {
+    handleSearch(currentPage + 1);
+  };
+
   const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
+
     if (event.key === 'Enter' && searchQuery.trim()) {
       handleSearch();
+    } else if (event.key === 'Escape') {
+      handleClearSearch();
+    } else if (event.key === 'Backspace' && searchQuery.endsWith(' :')) {
+      setShowQualifiers(false);
     }
   };
 
@@ -140,10 +153,19 @@ export default function Home() {
 
   const handleQualifierSelect = (name: string, example: string) => {
     const [prefix, value] = example.split(':');
-    const newQuery = `${searchQuery}${prefix}:${value} `;
+    const newQuery = `${searchQuery.endsWith(' :') ? searchQuery.slice(0, -1) : searchQuery}${prefix}:${value}`;
     setSearchQuery(newQuery);
     setShowQualifiers(false);
-    inputRef.current?.focus();
+
+    // Use setTimeout to ensure the input has been updated before trying to select text
+    setTimeout(() => {
+      if (inputRef.current) {
+        const startPos = newQuery.lastIndexOf(value);
+        const endPos = startPos + value.length;
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(startPos, endPos);
+      }
+    }, 0);
   };
 
   const parseSearchQuery = (query: string) => {
@@ -423,6 +445,11 @@ export default function Home() {
     resetQualifiers();
   };
 
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+    setCurrentPage(value);
+    handleSearch(value);
+  };
+
   return (
     <Container maxWidth="lg">
       <Typography variant="h4" component="h1" gutterBottom>
@@ -437,7 +464,7 @@ export default function Home() {
               label='Search repositories. (":" for search qualifiers...)'
               value={searchQuery}
               onChange={handleSearchQueryChange}
-              onKeyPress={handleKeyPress}
+              onKeyUp={handleKeyPress}
               inputRef={inputRef}
               title="Type ':' to see search filters"
               InputProps={{
@@ -466,7 +493,7 @@ export default function Home() {
           <Button variant="outlined" onClick={() => setShowAdvancedSearch(true)} sx={{ alignSelf: 'flex-start' }}>
             Advanced Search
           </Button>
-          {/* <Popper open={showQualifiers} anchorEl={anchorEl} placement="bottom-start">
+          <Popper open={showQualifiers} anchorEl={anchorEl} placement="bottom-start">
             <Paper>
               <List>
                 {qualifiers.map((qualifier) => (
@@ -474,12 +501,12 @@ export default function Home() {
                     key={qualifier.name}
                     onClick={() => handleQualifierSelect(qualifier.name.split(' ')[0].toLowerCase(), qualifier.example)}
                   >
-                    <ListItemText primary={qualifier.example} secondary={qualifier.example} />
+                    <ListItemText primary={qualifier.name} secondary={qualifier.example} />
                   </ListItemButton>
                 ))}
               </List>
             </Paper>
-          </Popper> */}
+          </Popper>
         </Box>
       )}
       {error && (
@@ -508,7 +535,22 @@ export default function Home() {
           ) : noResults ? (
             <Typography>No results found</Typography>
           ) : (
-            <SearchResults repositories={repositories} onRepoSelect={handleRepoSelect} />
+            <>
+              <SearchResults repositories={repositories} onRepoSelect={handleRepoSelect} />
+              {totalPages > 1 && (
+                <Box display="flex" justifyContent="center" mt={4}>
+                  <Pagination
+                    count={totalPages}
+                    page={currentPage}
+                    onChange={handlePageChange}
+                    color="primary"
+                  />
+                </Box>
+              )}
+              <Typography align="center" mt={2}>
+                Showing {repositories.length} of {totalCount} results
+              </Typography>
+            </>
           )}
         </>
       )}
@@ -641,6 +683,14 @@ export default function Home() {
           <Button onClick={handleAdvancedSearchApply} variant="contained">Apply</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Loading Backdrop */}
+      <Backdrop
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={loading}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
     </Container>
   );
 }

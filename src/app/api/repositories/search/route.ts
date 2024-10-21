@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     try {
         const result = await searchRepositoriesWithRegex(query, page, perPage);
         if (result.repositories.length === 0) {
-            return NextResponse.json({ repositories: [], totalCount: 0, message: 'No results found' });
+            return NextResponse.json({ repositories: [], totalCount: 0, currentPage: page, perPage: perPage, hasNextPage: false, message: 'No results found' });
         }
         return NextResponse.json(result);
     } catch (error) {

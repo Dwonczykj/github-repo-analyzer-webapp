@@ -164,17 +164,24 @@ const filterRepositoriesByRegex = (repositories: Repository[], pattern: string):
 };
 
 export class GitHubService {
-    static async searchRepositoriesWithRegex(query: string, page = 1, perPage = 30): Promise<{ repositories: Repository[], totalCount: number, error?: SearchError }> {
+    static async searchRepositoriesWithRegex(query: string, page = 1, perPage = 30): Promise<{
+        repositories: Repository[],
+        totalCount: number,
+        currentPage: number,
+        perPage: number,
+        hasNextPage: boolean,
+        error?: SearchError
+    }> {
         try {
             // Check query length
             if (query.length > 256) {
-                return { repositories: [], totalCount: 0, error: { message: 'Query is too long (max 256 characters)', type: 'query_length' } };
+                return { repositories: [], totalCount: 0, currentPage: page, perPage: perPage, hasNextPage: false, error: { message: 'Query is too long (max 256 characters)', type: 'query_length' } };
             }
 
             // Check for too many operators
             const operatorCount = (query.match(/\b(AND|OR|NOT)\b/g) || []).length;
             if (operatorCount > 5) {
-                return { repositories: [], totalCount: 0, error: { message: 'Query has too many AND, OR, or NOT operators (max 5)', type: 'query_operators' } };
+                return { repositories: [], totalCount: 0, currentPage: page, perPage: perPage, hasNextPage: false, error: { message: 'Query has too many AND, OR, or NOT operators (max 5)', type: 'query_operators' } };
             }
 
             const response = await githubApi.get('/search/repositories', {
@@ -191,19 +198,26 @@ export class GitHubService {
                 logger.warn(`Rate limit is low: ${rateLimit} requests remaining`);
             }
 
-            return { repositories: response.data.items, totalCount: response.data.total_count };
+            return {
+                repositories: response.data.items,
+                totalCount: response.data.total_count,
+                // You might want to include these for frontend pagination
+                currentPage: page,
+                perPage: perPage,
+                hasNextPage: response.data.items.length === perPage
+            };
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const axiosError = error as AxiosError;
                 if (axiosError.response?.status === 403 && axiosError.response.headers['x-ratelimit-remaining'] === '0') {
-                    return { repositories: [], totalCount: 0, error: { message: 'Rate limit exceeded', type: 'rate_limit' } };
+                    return { repositories: [], totalCount: 0, currentPage: page, perPage: perPage, hasNextPage: false, error: { message: 'Rate limit exceeded', type: 'rate_limit' } };
                 }
                 if (axiosError.response?.status === 422) {
-                    return { repositories: [], totalCount: 0, error: { message: 'Validation failed', type: 'validation_failed' } };
+                    return { repositories: [], totalCount: 0, currentPage: page, perPage: perPage, hasNextPage: false, error: { message: 'Validation failed', type: 'validation_failed' } };
                 }
             }
             logger.error('Error searching repositories:', error);
-            return { repositories: [], totalCount: 0, error: { message: 'An unknown error occurred', type: 'unknown' } };
+            return { repositories: [], totalCount: 0, currentPage: page, perPage: perPage, hasNextPage: false, error: { message: 'An unknown error occurred', type: 'unknown' } };
         }
     }
 
