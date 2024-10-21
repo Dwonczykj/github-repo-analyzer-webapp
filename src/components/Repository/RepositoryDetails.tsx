@@ -1,6 +1,6 @@
 import React, { useState, KeyboardEvent, useEffect } from 'react';
 import { RepositoryDetails as RepoDetails } from '@/services/githubService';
-import { Box, Typography, Paper, Grid, Chip, Link, Button, Dialog, DialogContent, DialogTitle, TextField } from '@mui/material';
+import { Box, Typography, Paper, Grid, Chip, Link, Button, Dialog, DialogContent, DialogTitle, TextField, Tabs, Tab } from '@mui/material';
 import { Star, ForkRight, BugReport, Code, Schedule, Update, Link as LinkIcon, Person, Search } from '@mui/icons-material';
 import RepositoryVisualizations from './RepositoryVisualizations';
 import RepositoryIssues from './RepositoryIssues';
@@ -11,11 +11,39 @@ interface RepositoryDetailsProps {
     repository: RepoDetails;
 }
 
+interface TabPanelProps {
+    children?: React.ReactNode;
+    index: number;
+    value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+    const { children, value, index, ...other } = props;
+
+    return (
+        <div
+            role="tabpanel"
+            hidden={value !== index}
+            id={`simple-tabpanel-${index}`}
+            aria-labelledby={`simple-tab-${index}`}
+            {...other}
+        >
+            {value === index && (
+                <Box sx={{ p: 3 }}>
+                    {children}
+                </Box>
+            )}
+        </div>
+    );
+}
+
 const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => {
     const [isIssuesDialogOpen, setIsIssuesDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [debouncedSearchQuery] = useDebounce(searchQuery, 1000);
+    const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
     const [executeSearch, setExecuteSearch] = useState(false);
+    const [searchResults, setSearchResults] = useState<any>(null);
+    const [tabValue, setTabValue] = useState(0);
 
     const handleOpenIssuesDialog = () => {
         setIsIssuesDialogOpen(true);
@@ -31,10 +59,33 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
         }
     }, [debouncedSearchQuery]);
 
+    useEffect(() => {
+        if (executeSearch) {
+            performSearch();
+        }
+    }, [executeSearch]);
+
     const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Enter') {
             setExecuteSearch(true);
         }
+    };
+
+    const performSearch = async () => {
+        try {
+            const response = await fetch(`/api/repositories/${repository.owner.login}/${repository.name}/search?q=${encodeURIComponent(debouncedSearchQuery)}`);
+            if (!response.ok) throw new Error('Failed to search repository');
+            const data = await response.json();
+            setSearchResults(data);
+        } catch (error) {
+            console.error('Error searching repository:', error);
+        } finally {
+            setExecuteSearch(false);
+        }
+    };
+
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setTabValue(newValue);
     };
 
     return (
@@ -65,9 +116,23 @@ const RepositoryDetails: React.FC<RepositoryDetailsProps> = ({ repository }) => 
                 </Button>
             </Box>
 
-            {executeSearch && (
-                <Box mb={4}>
-                    <RepositorySearch repository={repository} query={debouncedSearchQuery} />
+            {searchResults && (
+                <Box mt={2} mb={4}>
+                    <Typography variant="h6" gutterBottom>Search Results</Typography>
+                    <Tabs value={tabValue} onChange={handleTabChange} aria-label="search results tabs">
+                        <Tab label={`Files (${searchResults.files.length})`} />
+                        <Tab label={`Issues (${searchResults.issues.length})`} />
+                        <Tab label={`Commits (${searchResults.commits.length})`} />
+                    </Tabs>
+                    <TabPanel value={tabValue} index={0}>
+                        <RepositorySearch type="files" items={searchResults.files} />
+                    </TabPanel>
+                    <TabPanel value={tabValue} index={1}>
+                        <RepositorySearch type="issues" items={searchResults.issues} />
+                    </TabPanel>
+                    <TabPanel value={tabValue} index={2}>
+                        <RepositorySearch type="commits" items={searchResults.commits} />
+                    </TabPanel>
                 </Box>
             )}
 

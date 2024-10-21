@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useState, KeyboardEvent, useRef, useEffect } from 'react';
-import { Container, Typography, TextField, Button, Box, Popper, Paper, List, ListItemButton, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Chip, Autocomplete, FormControlLabel, Switch } from '@mui/material';
+import { Container, Typography, TextField, Button, Box, Popper, Paper, List, ListItemButton, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel, Chip, Autocomplete, FormControlLabel, Switch, IconButton, InputAdornment } from '@mui/material';
 import SearchResults from '@/components/Search/SearchResults';
 import { Repository, RepositoryDetails } from '@/services/githubService';
 import RepositoryDetailsComponent from '@/components/Repository/RepositoryDetails';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ClearIcon from '@mui/icons-material/Clear';
 
 const qualifiers = [
   { name: 'Repository name', example: 'repo:octocat/hello-world' },
-  { name: 'Organization / user name', example: 'user:defunkt' },
+  { name: 'Organization name', example: 'org:bcorp' },
+  { name: 'User name', example: 'user:defunkt' },
   { name: 'Language qualifier', example: 'language:javascript' },
   { name: 'Path qualifier', example: 'path:app/models' },
   { name: 'Symbol qualifier', example: 'symbol:function' },
@@ -68,15 +70,21 @@ export default function Home() {
   const [languageInput, setLanguageInput] = useState('');
   const [symbolQualifier, setSymbolQualifier] = useState('');
   const [isSymbolRegex, setIsSymbolRegex] = useState(false);
+  const [freeText, setFreeText] = useState('');
 
   useEffect(() => {
-    if (searchQuery.endsWith(':')) {
+    if (searchQuery.endsWith(' :') || searchQuery === (':')) {
       setShowQualifiers(true);
       setAnchorEl(inputRef.current);
     } else {
       setShowQualifiers(false);
     }
   }, [searchQuery]);
+
+  useEffect(() => {
+    // Initialize freeText with the current searchQuery when component mounts
+    setFreeText(searchQuery);
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -122,7 +130,7 @@ export default function Home() {
     setSelectedRepo(null);
   };
 
-  const handleQualifierSelect = (qualifier: string, example: string) => {
+  const handleQualifierSelect = (name: string, example: string) => {
     const [prefix, value] = example.split(':');
     const newQuery = `${searchQuery}${prefix}:${value} `;
     setSearchQuery(newQuery);
@@ -130,7 +138,69 @@ export default function Home() {
     inputRef.current?.focus();
   };
 
+  const parseSearchQuery = (query: string) => {
+    const qualifierRegex = /([\w-]+):("[^"]*"|[^\s]+)/g;
+    const qualifiers: { type: 'qualifier' | 'free'; key?: string; value: string }[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = qualifierRegex.exec(query)) !== null) {
+      if (lastIndex < match.index) {
+        qualifiers.push({ type: 'free', value: query.slice(lastIndex, match.index).trim() });
+      }
+      qualifiers.push({ type: 'qualifier', key: match[1], value: match[2].replace(/^"|"$/g, '') });
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < query.length) {
+      qualifiers.push({ type: 'free', value: query.slice(lastIndex).trim() });
+    }
+
+    return qualifiers;
+  };
+
   const handleAdvancedSearchOpen = () => {
+    const parsedQuery = parseSearchQuery(searchQuery);
+    const freeTextParts = parsedQuery
+      .filter(part => part.type === 'free')
+      .map(part => part.value);
+    setFreeText(freeTextParts.join(' ').trim());
+
+    // Set other qualifiers based on the parsed query
+    const newAdvancedSearchFields: Record<string, string> = {};
+    const newLanguageChips: string[] = [];
+    parsedQuery.forEach(part => {
+      if (part.type === 'qualifier' && part.key) {
+        switch (part.key) {
+          case 'language':
+            newLanguageChips.push(part.value);
+            break;
+          case 'is':
+            setIsQualifier(part.value);
+            break;
+          case 'content':
+            setContentQualifier(part.value);
+            break;
+          case 'symbol':
+            setSymbolQualifier(part.value);
+            break;
+          // case 'repo':
+          //   setRepo(part.value);
+          //   break;
+          // case 'org':
+          //   setSymbolQualifier(part.value);
+          //   break;
+          // case 'user':
+          //   setSymbolQualifier(part.value);
+          //   break;
+          default:
+            newAdvancedSearchFields[part.key] = part.value;
+        }
+      }
+    });
+
+    setAdvancedSearchFields(newAdvancedSearchFields);
+    setLanguageChips(newLanguageChips);
     setShowAdvancedSearch(true);
   };
 
@@ -170,7 +240,7 @@ export default function Home() {
   };
 
   const handleAdvancedSearchApply = () => {
-    const newQuery = Object.entries(advancedSearchFields)
+    const qualifiers = Object.entries(advancedSearchFields)
       .filter(([key, value]) => value.trim() !== '' && key !== 'content' && key !== 'language')
       .map(([key, value]) => `${key}:${value}`)
       .join(' ');
@@ -189,9 +259,15 @@ export default function Home() {
       symbolQuery = isSymbolRegex ? `symbol:/${symbolQualifier}/` : `symbol:${symbolQualifier}`;
     }
 
-    const combinedQuery = `${newQuery} ${languageQuery} ${isQualifierQuery} ${contentQualifierQuery} ${symbolQuery}`.trim();
+    const combinedQualifiers = [qualifiers, languageQuery, isQualifierQuery, contentQualifierQuery, symbolQuery]
+      .filter(q => q !== '')
+      .join(' ');
 
-    setSearchQuery(combinedQuery);
+    const newQuery = freeText.trim() !== ''
+      ? `${freeText} ${combinedQualifiers}`.trim()
+      : combinedQualifiers;
+
+    setSearchQuery(newQuery);
     setShowAdvancedSearch(false);
   };
 
@@ -220,6 +296,125 @@ export default function Home() {
     setLanguageInput('');
   };
 
+  const resetQualifiers = () => {
+    setLanguageChips([]);
+    setLanguageOperators([]);
+    setIsQualifier('');
+    setContentQualifier('');
+    setSymbolQualifier('');
+    setIsSymbolRegex(false);
+    setAdvancedSearchFields({
+      repo: '',
+      user: '',
+      org: '',
+      path: '',
+      // ... any other fields you have in advancedSearchFields
+    });
+  };
+
+  const handleSearchQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQuery = e.target.value;
+    setSearchQuery(newQuery);
+
+    // Updated regex patterns
+    const languageQualifierRegex = /\(?language:([^()]+)\)?/g;
+    const symbolQualifierRegex = /symbol:("[^"]+"|[^\s]+)/;
+    const contentQualifierRegex = /content:("[^"]+"|[^\s]+)/;
+    const isQualifierRegex = /\bis:(\S+)/;
+    const repoQualifierRegex = /repo:([^\s]+)/;
+    const userQualifierRegex = /(?:user):([^\s]+)/;
+    const orgQualifierRegex = /(?:org):([^\s]+)/;
+    const pathQualifierRegex = /path:("[^"]+"|[^\s]+)/;
+
+    // Parse language qualifiers
+    const languageMatches: string[] = [];
+    let match;
+    while ((match = languageQualifierRegex.exec(newQuery)) !== null) {
+      languageMatches.push(match[1]);
+    }
+
+    if (languageMatches.length > 0) {
+      const newLanguageChips = languageMatches.flatMap(match =>
+        match.split(/\s+(?:OR|AND)\s+/).map(lang => lang.trim())
+      );
+      setLanguageChips(newLanguageChips);
+      updateLanguageQuery(newLanguageChips, languageOperators.slice(0, newLanguageChips.length - 1));
+    } else {
+      setLanguageChips([]);
+    }
+
+    // Parse symbol qualifier
+    const symbolMatch = newQuery.match(symbolQualifierRegex);
+    setSymbolQualifier(symbolMatch ? symbolMatch[1].replace(/^"|"$/g, '') : '');
+
+    // Parse content qualifier
+    const contentMatch = newQuery.match(contentQualifierRegex);
+    setContentQualifier(contentMatch ? contentMatch[1].replace(/^"|"$/g, '') : '');
+
+    // Parse is qualifier
+    const isMatch = newQuery.match(isQualifierRegex);
+    setIsQualifier(isMatch ? isMatch[1] : '');
+
+    // Parse repository qualifier
+    const repoMatch = newQuery.match(repoQualifierRegex);
+    setAdvancedSearchFields(prev => ({
+      ...prev,
+      repo: repoMatch ? repoMatch[1] : ''
+    }));
+
+    // Parse user/org qualifier
+    const userMatch = newQuery.match(userQualifierRegex);
+    if (userMatch) {
+      const [fullMatch, value] = userMatch;
+      setAdvancedSearchFields(prev => ({
+        ...prev,
+        ['user']: value
+      }));
+    } else {
+      setAdvancedSearchFields(prev => ({
+        ...prev,
+        user: ''
+      }));
+    }
+    const orgMatch = newQuery.match(orgQualifierRegex);
+    if (orgMatch) {
+      const [fullMatch, value] = orgMatch;
+      const key = fullMatch.startsWith('org:') ? 'org' : 'org';
+      setAdvancedSearchFields(prev => ({
+        ...prev,
+        ['org']: value
+      }));
+    } else {
+      setAdvancedSearchFields(prev => ({
+        ...prev,
+        org: ''
+      }));
+    }
+
+    // Parse path qualifier
+    const pathMatch = newQuery.match(pathQualifierRegex);
+    setAdvancedSearchFields(prev => ({
+      ...prev,
+      path: pathMatch ? pathMatch[1].replace(/^"|"$/g, '') : ''
+    }));
+
+    // Check for malformed query
+    const openParenCount = (newQuery.match(/\(/g) || []).length;
+    const closeParenCount = (newQuery.match(/\)/g) || []).length;
+    if (openParenCount !== closeParenCount) {
+      resetQualifiers();
+    }
+
+    // Update free text
+    const freeText = newQuery.replace(/\([^)]*\)|[\w-]+:("[^"]*"|[^\s]+)/g, '').trim();
+    setFreeText(freeText);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    resetQualifiers();
+  };
+
   return (
     <Container maxWidth="lg">
       <Typography variant="h4" component="h1" gutterBottom>
@@ -233,10 +428,23 @@ export default function Home() {
               variant="outlined"
               label='Search repositories. (":" for search qualifiers...)'
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchQueryChange}
               onKeyPress={handleKeyPress}
               inputRef={inputRef}
               title="Type ':' to see search filters"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="clear search"
+                      onClick={handleClearSearch}
+                      edge="end"
+                    >
+                      <ClearIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
             <Button variant="contained" onClick={handleSearch} disabled={loading || !searchQuery.trim()} sx={{ ml: 1 }}>
               Search
@@ -245,7 +453,7 @@ export default function Home() {
           <Button variant="outlined" onClick={() => setShowAdvancedSearch(true)} sx={{ alignSelf: 'flex-start' }}>
             Advanced Search
           </Button>
-          <Popper open={showQualifiers} anchorEl={anchorEl} placement="bottom-start">
+          {/* <Popper open={showQualifiers} anchorEl={anchorEl} placement="bottom-start">
             <Paper>
               <List>
                 {qualifiers.map((qualifier) => (
@@ -253,12 +461,12 @@ export default function Home() {
                     key={qualifier.name}
                     onClick={() => handleQualifierSelect(qualifier.name.split(' ')[0].toLowerCase(), qualifier.example)}
                   >
-                    <ListItemText primary={qualifier.name} secondary={qualifier.example} />
+                    <ListItemText primary={qualifier.example} secondary={qualifier.example} />
                   </ListItemButton>
                 ))}
               </List>
             </Paper>
-          </Popper>
+          </Popper> */}
         </Box>
       )}
       {error && (
@@ -287,20 +495,28 @@ export default function Home() {
           )}
         </>
       )}
-      <Dialog open={showAdvancedSearch} onClose={() => setShowAdvancedSearch(false)}>
+      <Dialog open={showAdvancedSearch} onClose={handleAdvancedSearchClose}>
         <DialogTitle>Advanced Search</DialogTitle>
         <DialogContent>
-          {qualifiers.filter(q => q.name !== 'Content qualifier' && q.name !== 'Language qualifier').map((qualifier) => (
+          <TextField
+            fullWidth
+            label="Free Text Search"
+            variant="outlined"
+            margin="normal"
+            value={freeText}
+            onChange={(e) => setFreeText(e.target.value)}
+          />
+          {qualifiers.filter(q => !['Content qualifier', 'Language qualifier', 'Symbol qualifier'].includes(q.name)).map((qualifier) => (
             <TextField
               key={qualifier.name}
               fullWidth
               label={qualifier.name}
               variant="outlined"
               margin="normal"
-              value={advancedSearchFields[qualifier.name.split(' ')[0].toLowerCase()] || ''}
+              value={advancedSearchFields[qualifier.example.split(':')[0].toLowerCase()] || ''}
               onChange={(e) => setAdvancedSearchFields({
                 ...advancedSearchFields,
-                [qualifier.name.split(' ')[0].toLowerCase()]: e.target.value
+                [qualifier.example.split(':')[0].toLowerCase()]: e.target.value
               })}
             />
           ))}
@@ -404,7 +620,7 @@ export default function Home() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowAdvancedSearch(false)}>Cancel</Button>
+          <Button onClick={handleAdvancedSearchClose}>Cancel</Button>
           <Button onClick={handleAdvancedSearchApply} variant="contained">Apply</Button>
         </DialogActions>
       </Dialog>
