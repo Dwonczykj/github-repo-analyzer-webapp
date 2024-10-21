@@ -39,6 +39,27 @@ All individuals have different strengths so be sure to choose the approach to pr
 Could also add ability to login using OAuth and then make client side checks using the user's authentication token to access github resources...
 
 Should also be able to prompt github copilot using ai to find resources using llm prompts. There may be opensource projects that show us how to do this?
+
+Ability to perform smarter searches for github repos would be cool. 
+
+Add the two bottom searching methodologies:
+API Documentation | https://developer.github.com/v3/search/#search-issues
+REST API endpoints for search
+    - Implement [Text-Matching Highlighting](https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#example) in within repo results...
+    - [Search code](https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-code)
+        - Pull an entire repository's codebase files into a prompt for ai using chunking and then pass user query prompts to that chat completion chain to query information about that repository.
+        - [Regex Code Search](https://docs.github.com/en/search-github/github-code-search/understanding-github-code-search-syntax#using-regular-expressions)
+    - Search commits
+    - Search issues and pull requests
+    - Search labels
+    - Search repositories
+    - Search topics
+    - Search users
+GItHub Search API Documentation | https://developer.github.com/v3/search/
+
+Demonstrate some nice generic type functions, some protocol functions and some nice ts annotations ([vegi-backend-jd.git](https://github.com/vegiApp/peepl-eat-api)).
+
+Host the website on vercel.app with continous integration / tests?
 ## Additional Points and Notes:\
 \
 1. Implement the best design possible for the user interface. You are encouraged to make use of interface design solutions such as Twitter Bootstrap, Material and any other libraries you may deem necessary to provide your best solution.\

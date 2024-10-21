@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchRepositoriesWithRegex } from '@/services/githubService';
+import logger from '@/config/logging';
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
         const result = await searchRepositoriesWithRegex(query, page, perPage);
         return NextResponse.json(result);
     } catch (error) {
-        console.error('Error searching repositories:', error);
+        logger.error('Error searching repositories:', error);
         return NextResponse.json({ error: 'An error occurred while searching repositories' }, { status: 500 });
     }
 }

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import logger from '@/config/logging';
 
 function serverSideOnly<T extends (...args: any[]) => ReturnType<T>>(fn: T): T {
@@ -164,40 +164,48 @@ const filterRepositoriesByRegex = (repositories: Repository[], pattern: string):
 };
 
 export class GitHubService {
-    static searchRepositoriesWithRegex = serverSideOnly(async (query: string, page: number = 1, perPage: number = 30): Promise<{ repositories: Repository[], totalCount: number }> => {
-        const isRegex = isValidRegex(query);
-        let searchQuery = query;
+    static async searchRepositoriesWithRegex(query: string, page: number = 1, perPage: number = 30): Promise<{ repositories: Repository[], totalCount: number, error?: SearchError }> {
+        try {
+            // Check query length
+            if (query.length > 256) {
+                return { repositories: [], totalCount: 0, error: { message: 'Query is too long (max 256 characters)', type: 'query_length' } };
+            }
 
-        // Handle qualifiers
-        const qualifiers = ['repo:', 'user:', 'org:', 'language:', 'path:', 'symbol:', 'content:', 'is:'];
-        const hasQualifier = qualifiers.some(q => query.includes(q));
+            // Check for too many operators
+            const operatorCount = (query.match(/\b(AND|OR|NOT)\b/g) || []).length;
+            if (operatorCount > 5) {
+                return { repositories: [], totalCount: 0, error: { message: 'Query has too many AND, OR, or NOT operators (max 5)', type: 'query_operators' } };
+            }
 
-        if (isRegex && !hasQualifier) {
-            searchQuery = query.replace(/[^a-zA-Z0-9]/g, '');
+            const response = await githubApi.get('/search/repositories', {
+                params: {
+                    q: query,
+                    page,
+                    per_page: perPage
+                },
+            });
+
+            // Check rate limit
+            const rateLimit = parseInt(response.headers['x-ratelimit-remaining'] || '0', 10);
+            if (rateLimit <= 5) {
+                logger.warn(`Rate limit is low: ${rateLimit} requests remaining`);
+            }
+
+            return { repositories: response.data.items, totalCount: response.data.total_count };
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError;
+                if (axiosError.response?.status === 403 && axiosError.response.headers['x-ratelimit-remaining'] === '0') {
+                    return { repositories: [], totalCount: 0, error: { message: 'Rate limit exceeded', type: 'rate_limit' } };
+                }
+                if (axiosError.response?.status === 422) {
+                    return { repositories: [], totalCount: 0, error: { message: 'Validation failed', type: 'validation_failed' } };
+                }
+            }
+            logger.error('Error searching repositories:', error);
+            return { repositories: [], totalCount: 0, error: { message: 'An unknown error occurred', type: 'unknown' } };
         }
-
-        const response = await githubApi.get('/search/repositories', {
-            params: {
-                q: searchQuery,
-                page,
-                per_page: isRegex && !hasQualifier ? 100 : perPage
-            },
-        });
-
-        let repositories = response.data.items;
-        let totalCount = response.data.total_count;
-
-        if (isRegex && !hasQualifier) {
-            repositories = filterRepositoriesByRegex(repositories, query);
-            totalCount = repositories.length;
-
-            // Apply paging after filtering
-            const startIndex = (page - 1) * perPage;
-            repositories = repositories.slice(startIndex, startIndex + perPage);
-        }
-
-        return { repositories, totalCount };
-    });
+    }
 
     static searchRepositories = serverSideOnly(async (query: string): Promise<Repository[]> => {
         logger.debug(`Searching repositories with query: ${query}`);
@@ -327,4 +335,9 @@ export interface GitHubFork {
     };
     // Add other properties as needed
     stargazers_count: number;
+}
+
+interface SearchError {
+    message: string;
+    type: 'rate_limit' | 'query_length' | 'query_operators' | 'validation_failed' | 'unknown';
 }
